@@ -1,11 +1,16 @@
 """Shared fixtures for integration tests."""
 
 import json
-from datetime import datetime
+import os
+import sys
+from datetime import datetime, UTC
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+# Add backend directory to path so 'app' module is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "backend"))
 
 
 # ---------------------------------------------------------------------------
