@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impressions Generator — Project Overview</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #0f766e;
+            --primary-light: #14b8a6;
+            --primary-dark: #064e45;
+            --accent: #0ea5e9;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --bg-card-alt: #162032;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --gradient-1: linear-gradient(135deg, #0f766e 0%, #0ea5e9 100%);
+            --gradient-2: linear-gradient(135deg, #064e45 0%, #0f766e 50%, #0ea5e9 100%);
+            --shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ── Slide Container ── */
+        .slideshow {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px 80px;
+            opacity: 0;
+            transform: translateX(60px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+            pointer-events: none;
+            overflow-y: auto;
+        }
+
+        .slide.active {
+            opacity: 1;
+            transform: translateX(0);
+            pointer-events: all;
+        }
+
+        .slide.exit-left {
+            opacity: 0;
+            transform: translateX(-60px);
+        }
+
+        /* ── Navigation ── */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 40px;
+            background: rgba(15,23,42,0.92);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border);
+            z-index: 100;
+        }
+
+        .nav-bar button {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 28px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-bar button:hover { background: var(--primary); border-color: var(--primary); }
+        .nav-bar button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .nav-bar button:disabled:hover { background: var(--bg-card); border-color: var(--border); }
+
+        .slide-dots {
+            display: flex;
+            gap: 8px;
+        }
+        .slide-dots .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--border);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .slide-dots .dot.active {
+            background: var(--primary-light);
+            box-shadow: 0 0 8px var(--primary-light);
+            width: 28px;
+            border-radius: 5px;
+        }
+
+        .slide-counter {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ── Typography ── */
+        .slide-title {
+            font-size: 52px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+        .slide-title.gradient { background: var(--gradient-1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+        .slide-subtitle {
+            font-size: 22px;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-bottom: 40px;
+            max-width: 700px;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .section-label {
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: var(--primary-light);
+            margin-bottom: 16px;
+        }
+
+        h2 {
+            font-size: 38px;
+            font-weight: 700;
+            margin-bottom: 32px;
+            letter-spacing: -0.5px;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        p { line-height: 1.7; color: var(--text-muted); }
+
+        /* ── Cards Grid ── */
+        .cards {
+            display: grid;
+            gap: 20px;
+            width: 100%;
+            max-width: 1100px;
+        }
+        .cards.cols-2 { grid-template-columns: 1fr 1fr; }
+        .cards.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .cards.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px;
+            transition: all 0.3s;
+        }
+        .card:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: var(--shadow); }
+
+        .card .icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+
+        .card p { font-size: 14px; }
+
+        /* ── Architecture Diagram ── */
+        .arch-diagram {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 1000px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre;
+            overflow-x: auto;
+            color: var(--primary-light);
+        }
+
+        /* ── Table ── */
+        .slide-table {
+            width: 100%;
+            max-width: 1000px;
+            border-collapse: collapse;
+        }
+        .slide-table th {
+            text-align: left;
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border-bottom: 2px solid var(--primary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary-light);
+        }
+        .slide-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .slide-table tr:hover td { color: var(--text); background: var(--bg-card-alt); }
+
+        /* ── Tags ── */
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 3px;
+        }
+        .tag.teal { background: rgba(20,184,166,0.15); color: #5eead4; border: 1px solid rgba(20,184,166,0.3); }
+        .tag.blue { background: rgba(14,165,233,0.15); color: #7dd3fc; border: 1px solid rgba(14,165,233,0.3); }
+        .tag.purple { background: rgba(139,92,246,0.15); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
+        .tag.amber { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+        .tag.red { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+
+        /* ── Flow / Timeline ── */
+        .flow-steps {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            width: 100%;
+            max-width: 1100px;
+        }
+        .flow-step {
+            flex: 1;
+            text-align: center;
+            position: relative;
+        }
+        .flow-step .step-num {
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 16px;
+            margin: 0 auto 12px;
+        }
+        .flow-step .step-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+        .flow-step .step-desc { font-size: 12px; color: var(--text-muted); }
+        .flow-arrow {
+            color: var(--primary-light);
+            font-size: 24px;
+            flex-shrink: 0;
+            margin: 0 -8px;
+            padding-bottom: 30px;
+        }
+
+        /* ── Stat Blocks ── */
+        .stats-row {
+            display: flex;
+            gap: 32px;
+            margin-bottom: 36px;
+        }
+        .stat-block { text-align: center; }
+        .stat-block .stat-value {
+            font-size: 48px;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .stat-block .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+        /* ── List ── */
+        .checklist { list-style: none; max-width: 700px; }
+        .checklist li {
+            padding: 10px 0;
+            font-size: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .checklist li::before {
+            content: '✓';
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: var(--gradient-1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .slide { padding: 40px 24px; }
+            .slide-title { font-size: 36px; }
+            .slide-subtitle { font-size: 18px; }
+            h2 { font-size: 28px; }
+            .cards.cols-3, .cards.cols-4 { grid-template-columns: 1fr 1fr; }
+            .flow-steps { flex-wrap: wrap; }
+            .flow-arrow { display: none; }
+        }
+
+        /* ── Keyboard hint ── */
+        .keyboard-hint {
+            position: fixed;
+            top: 16px;
+            right: 24px;
+            font-size: 12px;
+            color: var(--text-muted);
+            z-index: 100;
+            opacity: 0.6;
+        }
+        .keyboard-hint kbd {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: inherit;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="keyboard-hint">Navigate: <kbd>←</kbd> <kbd>→</kbd> or <kbd>Space</kbd></div>
+
+<div class="slideshow" id="slideshow">
+
+    <!-- ═══════════ SLIDE 1: Title ═══════════ -->
+    <div class="slide active" data-slide="0">
+        <div class="section-label">Healthcare AI Platform</div>
+        <div class="slide-title gradient">Impressions Generator</div>
+        <p class="slide-subtitle">
+            AI-powered clinical note generation that writes in <strong style="color:#5eead4;">each doctor's unique style</strong> — 
+            grounded on dictated input, never hallucinating clinical data.
+        </p>
+        <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+            <span class="tag teal">Radiology</span>
+            <span class="tag teal">Oncology</span>
+            <span class="tag blue">Azure OpenAI</span>
+            <span class="tag blue">GPT-4o</span>
+            <span class="tag purple">FastAPI + Next.js</span>
+            <span class="tag amber">HIPAA Compliant</span>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 2: Problem ═══════════ -->
+    <div class="slide" data-slide="1">
+        <div class="section-label">The Problem</div>
+        <h2>Generic AI ≠ Doctor's Voice</h2>
+        <div class="cards cols-2" style="max-width:900px;">
+            <div class="card">
+                <div class="icon">❌</div>
+                <h3>Today's Reality</h3>
+                <p>AI summarization tools produce generic, cookie-cutter clinical notes. Every doctor's output reads the same — losing the nuanced, personalized language that colleagues and patients expect.</p>
+            </div>
+            <div class="card">
+                <div class="icon">✨</div>
+                <h3>Our Solution</h3>
+                <p>The Impressions Generator learns each doctor's unique writing style from their historical notes and produces structured reports (findings, impressions, recommendations) that sound like <em>them</em>.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🔢</div>
+                <h3>Grounding Guarantee</h3>
+                <p>Every clinical number, measurement, date, and percentage in the output comes directly from the dictated input. The system <strong>never invents</strong> clinical data.</p>
+            </div>
+            <div class="card">
+                <div class="icon">👥</div>
+                <h3>Multi-Doctor</h3>
+                <p>Support for unlimited doctors — each with their own style profile, isolated data, and personalized generation. An admin dashboard manages it all.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 3: How It Works ═══════════ -->
+    <div class="slide" data-slide="2">
+        <div class="section-label">How It Works</div>
+        <h2>From Dictation to Styled Report</h2>
+        <div class="flow-steps">
+            <div class="flow-step">
+                <div class="step-num">1</div>
+                <div class="step-label">Dictate / Paste</div>
+                <div class="step-desc">Doctor pastes raw dictated report text</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="step-num">2</div>
+                <div class="step-label">Retrieve Style</div>
+                <div class="step-desc">System fetches doctor's style profile &amp; examples</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="step-num">3</div>
+                <div class="step-label">Generate</div>
+                <div class="step-desc">Azure OpenAI creates structured report in doctor's voice</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="step-num">4</div>
+                <div class="step-label">Validate</div>
+                <div class="step-desc">Grounding layer verifies all clinical data is preserved</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">
+                <div class="step-num">5</div>
+                <div class="step-label">Review</div>
+                <div class="step-desc">Doctor reviews, edits, and approves the report</div>
+            </div>
+        </div>
+        <div style="margin-top:40px; text-align:center;">
+            <p style="font-size:14px; max-width:700px;">The style engine uses <strong style="color:#5eead4;">RAG (Retrieval-Augmented Generation)</strong> to pull the most relevant historical notes as few-shot examples, ensuring stylistic consistency.</p>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 4: Architecture ═══════════ -->
+    <div class="slide" data-slide="3">
+        <div class="section-label">Architecture</div>
+        <h2>Azure-Native Stack</h2>
+        <div class="arch-diagram">
+┌─────────────────────┐       ┌──────────────────────┐       ┌─────────────────────────┐
+│   React / Next.js   │──────▶│    FastAPI Backend    │──────▶│    Azure OpenAI (GPT-4o)│
+│   Azure Static      │       │    Azure Container    │       │    swedencentral         │
+│   Web Apps           │       │    Apps               │       └─────────────────────────┘
+└─────────────────────┘       └──────────┬───────────┘
+                                         │
+                              ┌──────────┼──────────────┐
+                              ▼          ▼              ▼
+                       ┌───────────┐ ┌─────────┐ ┌──────────────┐
+                       │ Cosmos DB │ │  Blob   │ │  AI Search   │
+                       │ (profiles │ │ Storage │ │ (embeddings  │
+                       │  reports) │ │ (files) │ │  style RAG)  │
+                       └───────────┘ └─────────┘ └──────────────┘
+
+     Auth: Azure Entra ID │ Secrets: Key Vault │ Monitoring: App Insights
+     Region: swedencentral │ IaC: Bicep │ CI/CD: GitHub Actions
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 5: Azure Services ═══════════ -->
+    <div class="slide" data-slide="4">
+        <div class="section-label">Infrastructure</div>
+        <h2>Azure Services — <span style="color:var(--primary-light)">swedencentral</span></h2>
+        <div class="cards cols-4">
+            <div class="card">
+                <div class="icon">🤖</div>
+                <h3>Azure OpenAI</h3>
+                <p>GPT-4o for note generation &amp; style extraction. HIPAA-eligible, data stays in tenant.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🗄️</div>
+                <h3>Cosmos DB</h3>
+                <p>NoSQL database for doctor profiles, reports, style metadata. Partitioned by doctor ID.</p>
+            </div>
+            <div class="card">
+                <div class="icon">📦</div>
+                <h3>Blob Storage</h3>
+                <p>Uploaded historical notes (PDF, DOCX, TXT). Encryption at rest, TLS 1.2+.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🔍</div>
+                <h3>AI Search</h3>
+                <p>Vector index for RAG-based retrieval of style-similar historical notes.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🐳</div>
+                <h3>Container Apps</h3>
+                <p>FastAPI backend with auto-scaling, managed identity, health probes.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🌐</div>
+                <h3>Static Web Apps</h3>
+                <p>Next.js frontend with SSR, staging slots, managed SSL.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🔐</div>
+                <h3>Key Vault</h3>
+                <p>Centralized secrets management. RBAC access model, soft delete enabled.</p>
+            </div>
+            <div class="card">
+                <div class="icon">📊</div>
+                <h3>App Insights</h3>
+                <p>Monitoring, distributed tracing, alerting. Log Analytics workspace.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 6: Tech Stack ═══════════ -->
+    <div class="slide" data-slide="5">
+        <div class="section-label">Technology</div>
+        <h2>Tech Stack</h2>
+        <div class="cards cols-3">
+            <div class="card" style="border-left: 3px solid #14b8a6;">
+                <h3>Frontend</h3>
+                <p style="margin-bottom:12px;">Modern React with server-side rendering</p>
+                <span class="tag teal">Next.js 14</span>
+                <span class="tag teal">TypeScript</span>
+                <span class="tag teal">Tailwind CSS</span>
+                <span class="tag teal">MSAL.js</span>
+            </div>
+            <div class="card" style="border-left: 3px solid #0ea5e9;">
+                <h3>Backend</h3>
+                <p style="margin-bottom:12px;">Async Python API with Azure SDK</p>
+                <span class="tag blue">Python 3.11</span>
+                <span class="tag blue">FastAPI</span>
+                <span class="tag blue">Pydantic</span>
+                <span class="tag blue">Azure SDK</span>
+            </div>
+            <div class="card" style="border-left: 3px solid #8b5cf6;">
+                <h3>DevOps</h3>
+                <p style="margin-bottom:12px;">Automated infrastructure and deployment</p>
+                <span class="tag purple">Bicep IaC</span>
+                <span class="tag purple">GitHub Actions</span>
+                <span class="tag purple">Docker</span>
+                <span class="tag purple">OIDC Auth</span>
+            </div>
+        </div>
+        <div style="margin-top: 32px;">
+            <div class="cards cols-3">
+                <div class="card" style="border-left: 3px solid #f59e0b;">
+                    <h3>AI / ML</h3>
+                    <span class="tag amber">GPT-4o</span>
+                    <span class="tag amber">Embeddings</span>
+                    <span class="tag amber">RAG</span>
+                    <span class="tag amber">Few-Shot</span>
+                </div>
+                <div class="card" style="border-left: 3px solid #ef4444;">
+                    <h3>Security</h3>
+                    <span class="tag red">Entra ID</span>
+                    <span class="tag red">Managed Identity</span>
+                    <span class="tag red">TLS 1.2+</span>
+                    <span class="tag red">HIPAA</span>
+                </div>
+                <div class="card" style="border-left: 3px solid #14b8a6;">
+                    <h3>Testing</h3>
+                    <span class="tag teal">Pytest</span>
+                    <span class="tag teal">Jest</span>
+                    <span class="tag teal">Playwright</span>
+                    <span class="tag teal">35 Test Cases</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 7: Features ═══════════ -->
+    <div class="slide" data-slide="6">
+        <div class="section-label">Features</div>
+        <h2>Key Capabilities</h2>
+        <div class="cards cols-2" style="max-width:950px;">
+            <div class="card">
+                <div class="icon">🎨</div>
+                <h3>Per-Doctor Style Profiles</h3>
+                <p>Upload historical notes (PDF, DOCX, TXT) or paste them directly. The system extracts vocabulary, abbreviation patterns, sentence structure, and section ordering unique to each doctor.</p>
+            </div>
+            <div class="card">
+                <div class="icon">📝</div>
+                <h3>Structured Report Generation</h3>
+                <p>Paste dictated text → get a structured report with <strong>Findings</strong>, <strong>Impressions</strong>, and <strong>Recommendations</strong> sections, all in the doctor's style.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🛡️</div>
+                <h3>Grounding Safeguards</h3>
+                <p>Post-generation validation extracts every number, measurement, date, and percentage from input and verifies exact preservation in output. Zero hallucination policy.</p>
+            </div>
+            <div class="card">
+                <div class="icon">✏️</div>
+                <h3>Review &amp; Edit Workflow</h3>
+                <p>Side-by-side comparison of dictation vs. generated report. Rich text editor for modifications. Version history tracks all changes from draft to final.</p>
+            </div>
+            <div class="card">
+                <div class="icon">👨‍💼</div>
+                <h3>Admin Dashboard</h3>
+                <p>Manage multiple doctors, view usage statistics, monitor generation quality, and configure system settings from a central admin panel.</p>
+            </div>
+            <div class="card">
+                <div class="icon">🔒</div>
+                <h3>HIPAA-Ready Security</h3>
+                <p>Azure Entra ID authentication, role-based access, encryption at rest and in transit, comprehensive audit logging, data retention policies.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 8: Frontend Pages ═══════════ -->
+    <div class="slide" data-slide="7">
+        <div class="section-label">Frontend</div>
+        <h2>Application Pages</h2>
+        <table class="slide-table">
+            <thead>
+                <tr>
+                    <th>Route</th>
+                    <th>Page</th>
+                    <th>Role</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/</code></td><td>Landing</td><td>Public</td><td>Hero section, Sign In with Microsoft, feature highlights</td></tr>
+                <tr><td><code>/dashboard</code></td><td>Dashboard</td><td>Doctor</td><td>Recent reports, quick actions, generation stats</td></tr>
+                <tr><td><code>/generate</code></td><td>Generate</td><td>Doctor</td><td>Dictation input, report type/body region selectors, live generation</td></tr>
+                <tr><td><code>/review/:id</code></td><td>Review</td><td>Doctor</td><td>Side-by-side viewer + editor, approve/reject, version history</td></tr>
+                <tr><td><code>/history</code></td><td>History</td><td>Doctor</td><td>Paginated report table with search and filters</td></tr>
+                <tr><td><code>/profile/notes</code></td><td>My Notes</td><td>Doctor</td><td>Upload/paste historical notes, manage note library</td></tr>
+                <tr><td><code>/admin</code></td><td>Admin</td><td>Admin</td><td>Doctor management, usage stats, system health</td></tr>
+                <tr><td><code>/admin/doctors/:id</code></td><td>Doctor Mgmt</td><td>Admin</td><td>Individual doctor profile, notes, style preview</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ═══════════ SLIDE 9: Deployment ═══════════ -->
+    <div class="slide" data-slide="8">
+        <div class="section-label">Deployment</div>
+        <h2>One-Command Azure Deployment</h2>
+        <div style="max-width:800px; width:100%;">
+            <div class="arch-diagram" style="margin-bottom:28px; font-size:14px;">
+<span style="color:#94a3b8;"># Deploy entire stack to Azure swedencentral</span>
+az deployment sub create \
+  --location swedencentral \
+  --template-file infrastructure/main.bicep \
+  --parameters infrastructure/main.bicepparam
+
+<span style="color:#94a3b8;"># Or use the helper scripts</span>
+.\infrastructure\scripts\deploy.ps1 -Environment dev    <span style="color:#94a3b8;"># Windows</span>
+bash infrastructure/scripts/deploy.sh -e dev             <span style="color:#94a3b8;"># Linux/macOS</span></div>
+            <div class="cards cols-3">
+                <div class="card" style="text-align:center;">
+                    <h3 style="color:var(--primary-light);">Dev</h3>
+                    <p>Serverless Cosmos, LRS Storage, Basic Search, 0-3 replicas, Free SWA</p>
+                </div>
+                <div class="card" style="text-align:center;">
+                    <h3 style="color:var(--accent);">Staging</h3>
+                    <p>Provisioned Cosmos, GRS Storage, Standard Search, 1-5 replicas</p>
+                </div>
+                <div class="card" style="text-align:center;">
+                    <h3 style="color:#fbbf24;">Production</h3>
+                    <p>Provisioned Cosmos, GRS Storage, Standard Search, 1-10 replicas, Standard SWA</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 10: Bicep Modules ═══════════ -->
+    <div class="slide" data-slide="9">
+        <div class="section-label">Infrastructure as Code</div>
+        <h2>Modular Bicep Templates</h2>
+        <div class="arch-diagram" style="max-width:800px; font-size:13px;">
+infrastructure/
+├── main.bicep                   <span style="color:#94a3b8;"># Orchestrator (subscription scope)</span>
+├── main.bicepparam              <span style="color:#94a3b8;"># Parameters (swedencentral defaults)</span>
+├── modules/
+│   ├── monitoring.bicep         <span style="color:#94a3b8;"># Log Analytics + App Insights</span>
+│   ├── storage.bicep            <span style="color:#94a3b8;"># StorageV2 + blob containers + TLS 1.2</span>
+│   ├── cosmosdb.bicep           <span style="color:#94a3b8;"># Cosmos NoSQL + 4 containers</span>
+│   ├── keyvault.bicep           <span style="color:#94a3b8;"># Key Vault + RBAC + secrets</span>
+│   ├── openai.bicep             <span style="color:#94a3b8;"># Azure OpenAI + GPT-4o deployment</span>
+│   ├── ai-search.bicep          <span style="color:#94a3b8;"># AI Search service</span>
+│   ├── container-apps.bicep     <span style="color:#94a3b8;"># Container Apps + FastAPI</span>
+│   └── static-web-app.bicep     <span style="color:#94a3b8;"># Static Web App + Next.js</span>
+└── scripts/
+    ├── deploy.ps1               <span style="color:#94a3b8;"># PowerShell deployment</span>
+    └── deploy.sh                <span style="color:#94a3b8;"># Bash deployment</span></div>
+        <div style="margin-top:24px;">
+            <ul class="checklist">
+                <li>Managed identities for service-to-service auth (no shared keys)</li>
+                <li>Key Vault references for secrets injection into Container Apps</li>
+                <li>Environment-parameterized SKU tiers and scaling rules</li>
+                <li>HIPAA: Encryption at rest, TLS 1.2 minimum, soft delete, 90-day retention</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 11: Testing ═══════════ -->
+    <div class="slide" data-slide="10">
+        <div class="section-label">Quality Assurance</div>
+        <h2>Comprehensive Test Suite</h2>
+        <div class="stats-row">
+            <div class="stat-block">
+                <div class="stat-value">35</div>
+                <div class="stat-label">Test Cases</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-value">5</div>
+                <div class="stat-label">Test Levels</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-value">80%+</div>
+                <div class="stat-label">Coverage Target</div>
+            </div>
+        </div>
+        <div class="cards cols-3" style="max-width:950px;">
+            <div class="card">
+                <h3>Backend Unit (T01-T15)</h3>
+                <p>Style extraction, grounding validation, auth middleware, file parsing, doctor isolation, report versioning</p>
+                <div style="margin-top:8px;"><span class="tag blue">Pytest</span><span class="tag blue">15 tests</span></div>
+            </div>
+            <div class="card">
+                <h3>Frontend Unit (T16-T22)</h3>
+                <p>Component rendering, form interactions, file upload, error handling, auth flow</p>
+                <div style="margin-top:8px;"><span class="tag teal">Jest</span><span class="tag teal">7 tests</span></div>
+            </div>
+            <div class="card">
+                <h3>Integration (T23-T26)</h3>
+                <p>Upload→Style pipeline, Generation pipeline, Auth E2E, Multi-doctor isolation</p>
+                <div style="margin-top:8px;"><span class="tag purple">Pytest</span><span class="tag purple">4 tests</span></div>
+            </div>
+            <div class="card">
+                <h3>E2E (T27-T30)</h3>
+                <p>Doctor onboarding journey, report generation journey, admin management, grounding E2E</p>
+                <div style="margin-top:8px;"><span class="tag amber">Playwright</span><span class="tag amber">4 tests</span></div>
+            </div>
+            <div class="card">
+                <h3>Non-Functional (T31-T35)</h3>
+                <p>Response time &lt;30s, 10 concurrent users, encryption at rest, TLS enforcement, token expiry</p>
+                <div style="margin-top:8px;"><span class="tag red">Performance</span><span class="tag red">5 tests</span></div>
+            </div>
+            <div class="card">
+                <h3>CI/CD Pipeline</h3>
+                <p>GitHub Actions: lint → test → build → Bicep validate → deploy to Azure (staging/prod)</p>
+                <div style="margin-top:8px;"><span class="tag purple">Automated</span><span class="tag purple">2 workflows</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 12: Milestones ═══════════ -->
+    <div class="slide" data-slide="11">
+        <div class="section-label">Roadmap</div>
+        <h2>Release Milestones</h2>
+        <div class="cards cols-3" style="max-width:1000px;">
+            <div class="card" style="border-top: 3px solid #14b8a6;">
+                <h3 style="color:#14b8a6;">v0.1 — MVP</h3>
+                <p style="margin-bottom:12px;">Core functionality</p>
+                <ul class="checklist" style="font-size:13px;">
+                    <li>Project scaffolding</li>
+                    <li>Azure Bicep deployment</li>
+                    <li>Entra ID authentication</li>
+                    <li>Doctor profiles CRUD</li>
+                    <li>Historical note upload</li>
+                    <li>Style extraction engine</li>
+                    <li>Report generation API</li>
+                    <li>Grounding safeguards</li>
+                    <li>Review &amp; edit UI</li>
+                    <li>Backend unit tests</li>
+                    <li>CI/CD pipeline</li>
+                </ul>
+            </div>
+            <div class="card" style="border-top: 3px solid #0ea5e9;">
+                <h3 style="color:#0ea5e9;">v0.2 — Admin</h3>
+                <p style="margin-bottom:12px;">Management &amp; polish</p>
+                <ul class="checklist" style="font-size:13px;">
+                    <li>Admin dashboard</li>
+                    <li>Multi-tenant isolation</li>
+                    <li>Style quality feedback</li>
+                    <li>Report versioning</li>
+                    <li>Frontend unit tests</li>
+                    <li>Integration tests</li>
+                </ul>
+            </div>
+            <div class="card" style="border-top: 3px solid #fbbf24;">
+                <h3 style="color:#fbbf24;">v1.0 — Production</h3>
+                <p style="margin-bottom:12px;">Enterprise-ready</p>
+                <ul class="checklist" style="font-size:13px;">
+                    <li>HIPAA compliance</li>
+                    <li>Data retention policies</li>
+                    <li>Audit logging</li>
+                    <li>E2E test suite</li>
+                    <li>Monitoring &amp; alerting</li>
+                    <li>Grounding accuracy tests</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════ SLIDE 13: Summary ═══════════ -->
+    <div class="slide" data-slide="12">
+        <div class="section-label">Summary</div>
+        <div class="slide-title gradient">Ready to Build</div>
+        <p class="slide-subtitle">
+            25 features across 7 epics. 35 test cases. Full Azure Bicep deployment. 
+            HIPAA-compliant architecture. All in <strong style="color:#5eead4;">swedencentral</strong>.
+        </p>
+        <div class="stats-row" style="margin-bottom:24px;">
+            <div class="stat-block">
+                <div class="stat-value">25</div>
+                <div class="stat-label">GitHub Issues</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-value">7</div>
+                <div class="stat-label">Epics</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-value">9</div>
+                <div class="stat-label">Bicep Modules</div>
+            </div>
+            <div class="stat-block">
+                <div class="stat-value">35</div>
+                <div class="stat-label">Test Cases</div>
+            </div>
+        </div>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; justify-content:center;">
+            <span class="tag teal" style="font-size:14px; padding:8px 20px;">React + Next.js</span>
+            <span class="tag blue" style="font-size:14px; padding:8px 20px;">Python + FastAPI</span>
+            <span class="tag purple" style="font-size:14px; padding:8px 20px;">Azure OpenAI GPT-4o</span>
+            <span class="tag amber" style="font-size:14px; padding:8px 20px;">Bicep IaC</span>
+            <span class="tag red" style="font-size:14px; padding:8px 20px;">HIPAA Compliant</span>
+        </div>
+        <p style="margin-top:40px; font-size:16px; color:var(--text);">
+            <a href="https://github.com/patmeh1/ImpressionsGenerator" style="color:var(--primary-light); text-decoration:none;" target="_blank">
+                github.com/patmeh1/ImpressionsGenerator →
+            </a>
+        </p>
+    </div>
+
+</div>
+
+<!-- ── Navigation Bar ── -->
+<div class="nav-bar">
+    <button id="prevBtn" onclick="changeSlide(-1)" disabled>← Previous</button>
+    <div style="display:flex; align-items:center; gap:20px;">
+        <div class="slide-dots" id="dots"></div>
+        <span class="slide-counter" id="counter">1 / 13</span>
+    </div>
+    <button id="nextBtn" onclick="changeSlide(1)">Next →</button>
+</div>
+
+<script>
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    let currentSlide = 0;
+
+    // Build dots
+    const dotsContainer = document.getElementById('dots');
+    for (let i = 0; i < totalSlides; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (i === 0 ? ' active' : '');
+        dot.onclick = () => goToSlide(i);
+        dotsContainer.appendChild(dot);
+    }
+
+    function goToSlide(index) {
+        if (index < 0 || index >= totalSlides || index === currentSlide) return;
+        const direction = index > currentSlide ? 1 : -1;
+        slides[currentSlide].classList.remove('active');
+        slides[currentSlide].classList.add(direction > 0 ? 'exit-left' : '');
+        setTimeout(() => slides[currentSlide === 0 ? 0 : currentSlide].classList.remove('exit-left'), 600);
+
+        currentSlide = index;
+        slides[currentSlide].classList.add('active');
+
+        // Update dots
+        document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+        // Update counter
+        document.getElementById('counter').textContent = `${currentSlide + 1} / ${totalSlides}`;
+        // Update buttons
+        document.getElementById('prevBtn').disabled = currentSlide === 0;
+        document.getElementById('nextBtn').disabled = currentSlide === totalSlides - 1;
+    }
+
+    function changeSlide(dir) { goToSlide(currentSlide + dir); }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+        if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); }
+        if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
+        if (e.key === 'End') { e.preventDefault(); goToSlide(totalSlides - 1); }
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
+    document.addEventListener('touchend', (e) => {
+        const diff = touchStartX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+    });
+</script>
+
+</body>
+</html>

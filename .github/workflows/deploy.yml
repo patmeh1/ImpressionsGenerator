@@ -1,0 +1,152 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+        default: dev
+
+permissions:
+  id-token: write   # OIDC for Azure federated credentials
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+env:
+  AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  # ------------------------------------------------------------------
+  # Gate: CI must pass first (on push to main)
+  # ------------------------------------------------------------------
+  ci-gate:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/ci.yml
+
+  # ------------------------------------------------------------------
+  # 1. Deploy infrastructure with Bicep
+  # ------------------------------------------------------------------
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [ci-gate]
+    if: always() && (needs.ci-gate.result == 'success' || github.event_name == 'workflow_dispatch')
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep
+        run: |
+          az deployment sub create \
+            --location eastus2 \
+            --template-file infrastructure/main.bicep \
+            --parameters environment=${{ env.ENVIRONMENT }} \
+            --name "deploy-${{ env.ENVIRONMENT }}-${{ github.run_number }}"
+
+  # ------------------------------------------------------------------
+  # 2. Build & deploy backend (Container App)
+  # ------------------------------------------------------------------
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure]
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
+
+      - name: Build & push Docker image
+        working-directory: backend
+        run: |
+          IMAGE=${{ env.ACR_NAME }}.azurecr.io/impressions-backend:${{ github.sha }}
+          docker build -t $IMAGE .
+          docker push $IMAGE
+
+      - name: Update Container App
+        run: |
+          IMAGE=${{ env.ACR_NAME }}.azurecr.io/impressions-backend:${{ github.sha }}
+          RESOURCE_GROUP="rg-impressions-${{ env.ENVIRONMENT }}"
+          APP_NAME="ca-impressions-backend-${{ env.ENVIRONMENT }}"
+
+          az containerapp update \
+            --name $APP_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --image $IMAGE
+
+  # ------------------------------------------------------------------
+  # 3. Build & deploy frontend (Static Web App)
+  # ------------------------------------------------------------------
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: [deploy-infrastructure]
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & build
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.BACKEND_URL }}
+          NEXT_PUBLIC_AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          NEXT_PUBLIC_AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: frontend
+          output_location: .next
+          skip_app_build: true
