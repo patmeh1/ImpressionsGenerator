@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user, require_role
 from app.models.doctor import DoctorCreate, DoctorResponse, DoctorUpdate
+from app.models.style_profile import StyleProfile
 from app.services.cosmos_db import cosmos_service
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,22 @@ async def update_doctor(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
     return updated
+
+
+@router.get("/{doctor_id}/style-profile", response_model=StyleProfile)
+async def get_style_profile(
+    doctor_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Get the extracted writing style profile for a doctor."""
+    _enforce_doctor_access(user, doctor_id)
+    profile = await cosmos_service.get_style_profile(doctor_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Style profile not found for this doctor",
+        )
+    return profile
 
 
 @router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)

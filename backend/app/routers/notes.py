@@ -133,6 +133,12 @@ async def delete_note(
 
     await cosmos_service.delete_note(doctor_id, note_id)
 
+    # Re-extract style profile after note removal (best-effort)
+    try:
+        await style_extraction_service.extract_style(doctor_id)
+    except Exception as e:
+        logger.warning("Style re-extraction failed after note deletion: %s", e)
+
 
 def _enforce_note_access(user: dict[str, Any], doctor_id: str) -> None:
     """Ensure non-admin users can only access their own notes."""
