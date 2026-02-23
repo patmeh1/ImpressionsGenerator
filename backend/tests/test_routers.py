@@ -225,11 +225,21 @@ async def test_get_report_not_found(client):
 
 @pytest.mark.asyncio
 async def test_update_report(client):
-    updated = {**SAMPLE_REPORT, "findings": "Updated.", "status": "edited",
-                "versions": [{"version": 1, "findings": "Normal liver.",
-                              "impressions": "No acute findings.",
-                              "recommendations": "None.", "status": "draft",
-                              "edited_at": datetime.utcnow().isoformat()}]}
+    updated = {
+        **SAMPLE_REPORT,
+        "findings": "Updated.",
+        "status": "edited",
+        "versions": [
+            {
+                "version": 1,
+                "findings": "Normal liver.",
+                "impressions": "No acute findings.",
+                "recommendations": "None.",
+                "status": "draft",
+                "edited_at": datetime.utcnow().isoformat(),
+            },
+        ],
+    }
     with patch("app.routers.reports.cosmos_service") as mock:
         mock.get_report = AsyncMock(return_value=SAMPLE_REPORT)
         mock.update_report = AsyncMock(return_value=updated)

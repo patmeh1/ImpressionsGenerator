@@ -539,7 +539,7 @@ class TestOpenAIService:
 
         svc = OpenAIService()
         examples = [
-            {"content": f"Note {i}", "findings": "", "impressions": "", "recommendations": ""}
+            {"input_text": f"Note {i}", "findings": "", "impressions": "", "recommendations": ""}
             for i in range(5)
         ]
         messages = svc._build_few_shot_messages(examples)
