@@ -177,7 +177,8 @@ class CosmosDBService:
             ))
 
     async def update_report(
-        self, report_id: str, doctor_id: str, data: dict[str, Any]
+        self, report_id: str, doctor_id: str, data: dict[str, Any],
+        edited_by: str = "",
     ) -> dict[str, Any] | None:
         existing = await self.get_report(report_id, doctor_id)
         if existing is None:
@@ -191,6 +192,7 @@ class CosmosDBService:
             "recommendations": existing.get("recommendations", ""),
             "status": existing.get("status", "draft"),
             "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": edited_by,
         }
         existing.setdefault("versions", []).append(version)
         existing.update({k: v for k, v in data.items() if v is not None})
@@ -202,15 +204,51 @@ class CosmosDBService:
         return existing
 
     async def approve_report(
-        self, report_id: str, doctor_id: str
+        self, report_id: str, doctor_id: str, approved_by: str = "",
     ) -> dict[str, Any] | None:
         existing = await self.get_report(report_id, doctor_id)
         if existing is None:
             return None
+
+        # Save current state as a version before marking final
+        version = {
+            "version": len(existing.get("versions", [])) + 1,
+            "findings": existing.get("findings", ""),
+            "impressions": existing.get("impressions", ""),
+            "recommendations": existing.get("recommendations", ""),
+            "status": existing.get("status", "draft"),
+            "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": approved_by,
+        }
+        existing.setdefault("versions", []).append(version)
         existing["status"] = "final"
         existing["updated_at"] = datetime.utcnow().isoformat()
         self._container("reports").replace_item(item=report_id, body=existing)
         logger.info("Approved report %s", report_id)
+        return existing
+
+    async def reject_report(
+        self, report_id: str, doctor_id: str, rejected_by: str = "",
+    ) -> dict[str, Any] | None:
+        existing = await self.get_report(report_id, doctor_id)
+        if existing is None:
+            return None
+
+        # Save current state as a version before marking rejected
+        version = {
+            "version": len(existing.get("versions", [])) + 1,
+            "findings": existing.get("findings", ""),
+            "impressions": existing.get("impressions", ""),
+            "recommendations": existing.get("recommendations", ""),
+            "status": existing.get("status", "draft"),
+            "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": rejected_by,
+        }
+        existing.setdefault("versions", []).append(version)
+        existing["status"] = "rejected"
+        existing["updated_at"] = datetime.utcnow().isoformat()
+        self._container("reports").replace_item(item=report_id, body=existing)
+        logger.info("Rejected report %s", report_id)
         return existing
 
     # --- Style Profile operations ---

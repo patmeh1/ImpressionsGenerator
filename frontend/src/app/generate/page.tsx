@@ -57,6 +57,7 @@ export default function GeneratePage() {
         impressions: res.impressions,
         recommendations: res.recommendations,
         status: 'draft',
+        versions: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });

@@ -48,6 +48,7 @@ async def update_report(
         report_id=report_id,
         doctor_id=report["doctor_id"],
         data=data,
+        edited_by=user.get("user_id", ""),
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
@@ -64,10 +65,28 @@ async def approve_report(
     approved = await cosmos_service.approve_report(
         report_id=report_id,
         doctor_id=report["doctor_id"],
+        approved_by=user.get("user_id", ""),
     )
     if not approved:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     return approved
+
+
+@router.post("/{report_id}/reject", response_model=ReportResponse)
+async def reject_report(
+    report_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Mark a report as rejected."""
+    report = await _find_report(report_id, user)
+    rejected = await cosmos_service.reject_report(
+        report_id=report_id,
+        doctor_id=report["doctor_id"],
+        rejected_by=user.get("user_id", ""),
+    )
+    if not rejected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    return rejected
 
 
 @router.get("/{report_id}/versions")

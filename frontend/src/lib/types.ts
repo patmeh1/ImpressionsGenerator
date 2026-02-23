@@ -27,7 +27,8 @@ export interface Report {
   findings: string;
   impressions: string;
   recommendations: string;
-  status: 'draft' | 'approved' | 'rejected';
+  status: 'draft' | 'edited' | 'final' | 'rejected';
+  versions: ReportVersion[];
   created_at: string;
   updated_at: string;
 }
@@ -58,14 +59,13 @@ export interface GenerateResponse {
 }
 
 export interface ReportVersion {
-  id: string;
-  report_id: string;
-  version_number: number;
+  version: number;
   findings: string;
   impressions: string;
   recommendations: string;
+  status: 'draft' | 'edited' | 'final' | 'rejected';
+  edited_at: string;
   edited_by: string;
-  created_at: string;
 }
 
 export interface UsageStatsData {
