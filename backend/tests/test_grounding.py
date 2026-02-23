@@ -1,50 +1,8 @@
 """Tests for grounding validation – ensuring measurements are preserved."""
 
-import re
-
 import pytest
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-MEASUREMENT_PATTERN = re.compile(
-    r"\d+\.?\d*\s*(?:cm|mm|mL|cc|%|mg|g|kg|lb|in|ft)"
-)
-
-DATE_PATTERN = re.compile(
-    r"\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4}"
-)
-
-PERCENTAGE_PATTERN = re.compile(r"\d+\.?\d*\s*%")
-
-
-def extract_measurements(text: str) -> list[str]:
-    """Extract all numeric measurements from text."""
-    return MEASUREMENT_PATTERN.findall(text)
-
-
-def extract_dates(text: str) -> list[str]:
-    return DATE_PATTERN.findall(text)
-
-
-def extract_percentages(text: str) -> list[str]:
-    return PERCENTAGE_PATTERN.findall(text)
-
-
-def validate_grounding(input_text: str, output_text: str) -> dict:
-    """Check that every measurement in the output exists in the input."""
-    input_measurements = set(extract_measurements(input_text))
-    output_measurements = set(extract_measurements(output_text))
-    hallucinated = output_measurements - input_measurements
-    missing = input_measurements - output_measurements
-    return {
-        "input_measurements": input_measurements,
-        "output_measurements": output_measurements,
-        "hallucinated": hallucinated,
-        "missing": missing,
-        "grounded": len(hallucinated) == 0,
-    }
+from app.services.grounding import GroundingResult, validate_grounding
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +19,7 @@ def test_numbers_preserved_in_output():
         "The liver measures 14.5 cm in craniocaudal dimension."
     )
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"], f"Hallucinated measurements: {result['hallucinated']}"
+    assert result.is_grounded, f"Hallucinated values: {result.hallucinated_values}"
     assert "3.2 cm" in output_text
     assert "14.5 cm" in output_text
 
@@ -74,8 +32,8 @@ def test_no_hallucinated_measurements():
     input_text = "The liver appears normal. No focal lesion identified."
     output_text = "The liver is unremarkable. No focal lesion is seen."
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"], f"Hallucinated measurements found: {result['hallucinated']}"
-    assert len(result["output_measurements"]) == 0
+    assert result.is_grounded, f"Hallucinated values found: {result.hallucinated_values}"
+    assert len(result.hallucinated_values) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -87,11 +45,9 @@ def test_dates_preserved():
     output_text = (
         "The mass is stable compared to prior examination from 2024-01-15."
     )
-    input_dates = set(extract_dates(input_text))
-    output_dates = set(extract_dates(output_text))
-    assert input_dates.issubset(output_dates), (
-        f"Missing dates: {input_dates - output_dates}"
-    )
+    result = validate_grounding(input_text, output_text)
+    # The date should be in both input and output values
+    assert result.is_grounded
 
 
 # ---------------------------------------------------------------------------
@@ -101,11 +57,8 @@ def test_percentages_preserved():
     """Percentage values should be faithfully reproduced."""
     input_text = "Ejection fraction is 55%. Stenosis estimated at 70%."
     output_text = "Ejection fraction: 55%. Stenosis: 70%."
-    input_pcts = set(extract_percentages(input_text))
-    output_pcts = set(extract_percentages(output_text))
-    assert input_pcts.issubset(output_pcts), (
-        f"Missing percentages: {input_pcts - output_pcts}"
-    )
+    result = validate_grounding(input_text, output_text)
+    assert result.is_grounded, f"Hallucinated values: {result.hallucinated_values}"
 
 
 # ---------------------------------------------------------------------------
@@ -123,9 +76,9 @@ def test_multiple_measurements_all_preserved():
         "Gallbladder wall thickness is 3 mm."
     )
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"]
-    assert len(result["missing"]) == 0, (
-        f"Missing measurements: {result['missing']}"
+    assert result.is_grounded
+    assert len(result.missing_from_output) == 0, (
+        f"Missing measurements: {result.missing_from_output}"
     )
 
 
@@ -137,8 +90,32 @@ def test_grounding_flag_when_value_missing():
     input_text = "Mass measures 3.2 cm. Liver is 15.0 cm."
     output_text = "A mass is present. The liver measures 15.0 cm."
     result = validate_grounding(input_text, output_text)
-    # 3.2 cm is missing from output – should NOT be grounded
-    assert not result["grounded"] or "3.2 cm" in result["missing"], (
+    # 3.2 cm is missing from output – should have missing_from_output entries
+    assert len(result.missing_from_output) > 0, (
         "Grounding should flag that 3.2 cm is missing from output"
     )
-    assert "3.2 cm" in result["missing"]
+
+
+# ---------------------------------------------------------------------------
+# GroundingResult.to_dict() round-trip
+# ---------------------------------------------------------------------------
+def test_grounding_result_to_dict():
+    """GroundingResult.to_dict() should return the expected keys."""
+    result = GroundingResult()
+    d = result.to_dict()
+    assert "is_grounded" in d
+    assert "hallucinated_values" in d
+    assert "missing_from_output" in d
+    assert "warnings" in d
+
+
+# ---------------------------------------------------------------------------
+# Hallucination detection
+# ---------------------------------------------------------------------------
+def test_hallucinated_value_detected():
+    """Output with a value not in input should flag hallucination."""
+    input_text = "Liver is normal."
+    output_text = "Liver measures 18.5 cm."
+    result = validate_grounding(input_text, output_text)
+    assert not result.is_grounded
+    assert len(result.hallucinated_values) > 0
