@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getDoctors, generateReport } from '@/lib/api';
 import type { Doctor, Report } from '@/lib/types';
 import DictationInput from '@/components/DictationInput';
 import DoctorSelector from '@/components/DoctorSelector';
 import ReportViewer from '@/components/ReportViewer';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, RotateCcw } from 'lucide-react';
 
 const REPORT_TYPES = ['CT', 'MRI', 'X-ray', 'PET', 'Ultrasound'];
 const BODY_REGIONS = [
@@ -33,8 +33,8 @@ export default function GeneratePage() {
       .catch(console.error);
   }, []);
 
-  const handleGenerate = async () => {
-    if (!selectedDoctorId || !inputText.trim()) return;
+  const handleGenerate = useCallback(async () => {
+    if (!selectedDoctorId || !inputText.trim() || generating) return;
     setGenerating(true);
     setError(null);
     setGeneratedReport(null);
@@ -65,7 +65,26 @@ export default function GeneratePage() {
     } finally {
       setGenerating(false);
     }
+  }, [selectedDoctorId, inputText, reportType, bodyRegion, generating]);
+
+  const handleReset = () => {
+    setInputText('');
+    setReportType('CT');
+    setBodyRegion('Abdomen');
+    setGeneratedReport(null);
+    setError(null);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleGenerate();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleGenerate]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -129,7 +148,7 @@ export default function GeneratePage() {
           />
         </div>
 
-        {/* Generate Button */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-3">
           <button
             onClick={handleGenerate}
@@ -139,7 +158,7 @@ export default function GeneratePage() {
             {generating ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                Generating...
+                Generating report…
               </>
             ) : (
               <>
@@ -148,6 +167,17 @@ export default function GeneratePage() {
               </>
             )}
           </button>
+          <button
+            onClick={handleReset}
+            disabled={generating}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <RotateCcw size={16} />
+            Clear
+          </button>
+          <span className="text-xs text-slate-400 dark:text-slate-500 ml-auto">
+            Ctrl+Enter to generate
+          </span>
         </div>
 
         {error && (
