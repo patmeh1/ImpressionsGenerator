@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 
 from app.auth.dependencies import get_current_user
 from app.models.note import NoteResponse, SourceType
+from app.services.audit import audit_service
 from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
 from app.services.ai_search import ai_search_service
@@ -70,6 +71,8 @@ async def create_note(
 
     note = await cosmos_service.create_note(doctor_id, note_data)
 
+    audit_service.log_data_access(user, "note", note["id"], "create")
+
     # Index note in AI Search for RAG retrieval
     try:
         await ai_search_service.index_note({
@@ -102,6 +105,7 @@ async def list_notes(
 ) -> list[dict[str, Any]]:
     """List all notes for a doctor."""
     _enforce_note_access(user, doctor_id)
+    audit_service.log_data_access(user, "note", doctor_id, "list")
     return await cosmos_service.list_notes(doctor_id)
 
 
@@ -132,6 +136,7 @@ async def delete_note(
         logger.warning("Failed to delete note %s from search index: %s", note_id, e)
 
     await cosmos_service.delete_note(doctor_id, note_id)
+    audit_service.log_admin_action(user, "delete", "note", note_id)
 
 
 def _enforce_note_access(user: dict[str, Any], doctor_id: str) -> None:
