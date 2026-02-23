@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { getReport, updateReport, getReportVersions } from '@/lib/api';
 import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
@@ -68,19 +69,24 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <ProtectedRoute>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-primary-500" />
+        </div>
+      </ProtectedRoute>
     );
   }
 
   if (!report) {
     return (
-      <div className="text-center py-20 text-slate-500">Report not found.</div>
+      <ProtectedRoute>
+        <div className="text-center py-20 text-slate-500">Report not found.</div>
+      </ProtectedRoute>
     );
   }
 
   return (
+    <ProtectedRoute>
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
@@ -160,5 +166,6 @@ export default function ReviewPage() {
         </div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

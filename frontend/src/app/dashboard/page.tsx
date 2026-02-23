@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getReports, getAdminStats } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Report, UsageStatsData } from '@/lib/types';
 import {
   Sparkles,
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
+    <ProtectedRoute>
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
 
@@ -168,5 +170,6 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
