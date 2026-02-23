@@ -5,7 +5,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.report import GenerateRequest, ReportResponse, ReportStatus
+from app.models.report import GenerateRequest, ReportStatus
+from app.models.style_profile import StyleProfile
+from app.services.generation import DoctorNotFoundError, GenerationService
 
 
 # ---------------------------------------------------------------------------
@@ -150,3 +152,107 @@ def test_generate_request_model():
 def test_report_status_enum():
     assert ReportStatus.DRAFT.value == "draft"
     assert ReportStatus.FINAL.value == "final"
+
+
+# ---------------------------------------------------------------------------
+# DoctorNotFoundError raised for missing doctor
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_raises_doctor_not_found_error():
+    """GenerationService.generate raises DoctorNotFoundError for non-existent doctor."""
+    service = GenerationService()
+
+    with patch("app.services.generation.cosmos_service") as mock_cosmos:
+        mock_cosmos.get_doctor = AsyncMock(return_value=None)
+
+        with pytest.raises(DoctorNotFoundError, match="not found"):
+            await service.generate(
+                dictated_text="Normal CT abdomen.",
+                doctor_id="non-existent",
+                report_type="CT",
+                body_region="Abdomen",
+            )
+
+
+# ---------------------------------------------------------------------------
+# Response includes grounding_validation key
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_returns_grounding_validation_key():
+    """Generated report dict must include 'grounding_validation' key."""
+    service = GenerationService()
+
+    mock_report = {
+        "id": "report-001",
+        "doctor_id": "doctor-001",
+        "input_text": "Liver 14.5 cm.",
+        "findings": "Liver 14.5 cm.",
+        "impressions": "Normal.",
+        "recommendations": "None.",
+        "status": "draft",
+    }
+
+    with (
+        patch("app.services.generation.cosmos_service") as mock_cosmos,
+        patch("app.services.generation.openai_service") as mock_openai,
+        patch("app.services.generation.ai_search_service") as mock_search,
+        patch("app.services.generation.style_extraction_service") as mock_style,
+    ):
+        mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
+        mock_cosmos.get_style_profile = AsyncMock(return_value=None)
+        mock_cosmos.create_report = AsyncMock(return_value=mock_report.copy())
+        mock_openai.generate_report = AsyncMock(return_value={
+            "findings": "Liver 14.5 cm.",
+            "impressions": "Normal.",
+            "recommendations": "None.",
+        })
+        mock_search.search_similar_notes = AsyncMock(return_value=[])
+        mock_search.index_report = AsyncMock()
+        mock_style.extract_style = AsyncMock(
+            return_value=StyleProfile(doctor_id="doctor-001")
+        )
+        mock_style.build_style_instructions.return_value = "Use short sentences."
+
+        result = await service.generate(
+            dictated_text="Liver 14.5 cm.",
+            doctor_id="doctor-001",
+            report_type="CT",
+            body_region="Abdomen",
+        )
+
+        assert "grounding_validation" in result
+        assert "is_grounded" in result["grounding_validation"]
+
+
+# ---------------------------------------------------------------------------
+# OpenAI RuntimeError is propagated (router maps to 503)
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_propagates_runtime_error_from_openai():
+    """RuntimeError from OpenAI service should propagate from generate()."""
+    service = GenerationService()
+
+    with (
+        patch("app.services.generation.cosmos_service") as mock_cosmos,
+        patch("app.services.generation.openai_service") as mock_openai,
+        patch("app.services.generation.ai_search_service") as mock_search,
+        patch("app.services.generation.style_extraction_service") as mock_style,
+    ):
+        mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
+        mock_cosmos.get_style_profile = AsyncMock(return_value=None)
+        mock_openai.generate_report = AsyncMock(
+            side_effect=RuntimeError("OpenAIService not initialized")
+        )
+        mock_search.search_similar_notes = AsyncMock(return_value=[])
+        mock_style.extract_style = AsyncMock(
+            return_value=StyleProfile(doctor_id="doctor-001")
+        )
+        mock_style.build_style_instructions.return_value = "Use short sentences."
+
+        with pytest.raises(RuntimeError, match="OpenAIService not initialized"):
+            await service.generate(
+                dictated_text="Normal CT abdomen.",
+                doctor_id="doctor-001",
+                report_type="CT",
+                body_region="Abdomen",
+            )
