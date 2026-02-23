@@ -28,6 +28,17 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   }
 }
 
+// --- User-Assigned Managed Identity (shared by container app + Key Vault RBAC) ---
+module managedIdentity 'modules/managed-identity.bicep' = {
+  name: 'managed-identity-deployment'
+  scope: resourceGroup
+  params: {
+    location: location
+    environmentName: environmentName
+    projectName: projectName
+  }
+}
+
 // --- 1. Monitoring (Log Analytics + App Insights) ---
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring-deployment'
@@ -43,6 +54,7 @@ module monitoring 'modules/monitoring.bicep' = {
 module storage 'modules/storage.bicep' = {
   name: 'storage-deployment'
   scope: resourceGroup
+  dependsOn: [monitoring]
   params: {
     location: location
     environmentName: environmentName
@@ -54,6 +66,7 @@ module storage 'modules/storage.bicep' = {
 module cosmosdb 'modules/cosmosdb.bicep' = {
   name: 'cosmosdb-deployment'
   scope: resourceGroup
+  dependsOn: [storage]
   params: {
     location: location
     environmentName: environmentName
@@ -61,10 +74,25 @@ module cosmosdb 'modules/cosmosdb.bicep' = {
   }
 }
 
-// --- 4. Azure OpenAI ---
+// --- 4. Key Vault (depends on cosmosdb, storage; uses managed identity for RBAC) ---
+module keyvault 'modules/keyvault.bicep' = {
+  name: 'keyvault-deployment'
+  scope: resourceGroup
+  params: {
+    location: location
+    environmentName: environmentName
+    projectName: projectName
+    appIdentityPrincipalId: managedIdentity.outputs.principalId
+    cosmosEndpoint: cosmosdb.outputs.cosmosEndpoint
+    storageAccountName: storage.outputs.storageAccountName
+  }
+}
+
+// --- 5. Azure OpenAI ---
 module openai 'modules/openai.bicep' = {
   name: 'openai-deployment'
   scope: resourceGroup
+  dependsOn: [keyvault]
   params: {
     location: location
     environmentName: environmentName
@@ -72,10 +100,11 @@ module openai 'modules/openai.bicep' = {
   }
 }
 
-// --- 5. AI Search ---
+// --- 6. AI Search ---
 module aiSearch 'modules/ai-search.bicep' = {
   name: 'ai-search-deployment'
   scope: resourceGroup
+  dependsOn: [openai]
   params: {
     location: location
     environmentName: environmentName
@@ -83,7 +112,7 @@ module aiSearch 'modules/ai-search.bicep' = {
   }
 }
 
-// --- 6. Container Apps (depends on monitoring, storage, cosmosdb, openai, ai-search) ---
+// --- 7. Container Apps (depends on all upstream modules) ---
 module containerApps 'modules/container-apps.bicep' = {
   name: 'container-apps-deployment'
   scope: resourceGroup
@@ -91,6 +120,8 @@ module containerApps 'modules/container-apps.bicep' = {
     location: location
     environmentName: environmentName
     projectName: projectName
+    managedIdentityId: managedIdentity.outputs.identityId
+    managedIdentityClientId: managedIdentity.outputs.clientId
     cosmosEndpoint: cosmosdb.outputs.cosmosEndpoint
     storageAccountName: storage.outputs.storageAccountName
     blobEndpoint: storage.outputs.blobEndpoint
@@ -100,22 +131,7 @@ module containerApps 'modules/container-apps.bicep' = {
     searchServiceName: aiSearch.outputs.searchServiceName
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     logAnalyticsWorkspaceId: monitoring.outputs.logAnalyticsWorkspaceId
-  }
-}
-
-// --- 7. Key Vault (depends on container apps for principal ID) ---
-module keyvault 'modules/keyvault.bicep' = {
-  name: 'keyvault-deployment'
-  scope: resourceGroup
-  params: {
-    location: location
-    environmentName: environmentName
-    projectName: projectName
-    containerAppPrincipalId: containerApps.outputs.containerAppPrincipalId
-    cosmosEndpoint: cosmosdb.outputs.cosmosEndpoint
-    storageAccountName: storage.outputs.storageAccountName
-    openaiEndpoint: openai.outputs.openaiEndpoint
-    searchEndpoint: aiSearch.outputs.searchEndpoint
+    keyVaultUri: keyvault.outputs.keyVaultUri
   }
 }
 
@@ -123,6 +139,7 @@ module keyvault 'modules/keyvault.bicep' = {
 module staticWebApp 'modules/static-web-app.bicep' = {
   name: 'static-web-app-deployment'
   scope: resourceGroup
+  dependsOn: [containerApps]
   params: {
     location: location
     environmentName: environmentName
