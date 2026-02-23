@@ -34,12 +34,19 @@ class GroundingResult:
     is_grounded: bool = True
     input_values: dict[str, list[str]] = field(default_factory=dict)
     output_values: dict[str, list[str]] = field(default_factory=dict)
+    preserved_values: list[str] = field(default_factory=list)
     missing_from_output: list[str] = field(default_factory=list)
     hallucinated_values: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            # Acceptance-criteria field names
+            "is_valid": self.is_grounded,
+            "preserved_values": self.preserved_values,
+            "missing_values": self.missing_from_output,
+            "suspicious_values": self.hallucinated_values,
+            # Legacy field names kept for backward compatibility
             "is_grounded": self.is_grounded,
             "input_values": self.input_values,
             "output_values": self.output_values,
@@ -111,9 +118,13 @@ def validate_grounding(input_text: str, output_text: str) -> GroundingResult:
             result.hallucinated_values.append(f"number: {num}")
 
     # Check for input measurements missing from output (warnings only)
-    for category in ["measurements", "units_with_values"]:
+    # and track preserved values (found in both input and output)
+    for category in ["measurements", "units_with_values", "percentages"]:
         input_vals = input_values.get(category, set())
         output_vals = output_values.get(category, set())
+        preserved = input_vals & output_vals
+        for val in sorted(preserved):
+            result.preserved_values.append(f"{category}: {val}")
         missing = input_vals - output_vals
         for val in missing:
             result.missing_from_output.append(f"{category}: {val}")

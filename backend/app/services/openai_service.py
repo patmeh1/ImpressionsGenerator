@@ -48,6 +48,7 @@ GROUNDING RULES:
 {grounding_rules}
 
 IMPORTANT:
+- You MUST NOT invent any clinical measurements, numbers, or findings.
 - Only include clinical information explicitly stated or directly implied by the dictation.
 - Do NOT fabricate measurements, dates, values, or findings.
 - Every number, measurement, and percentage in the output MUST originate from the input.
