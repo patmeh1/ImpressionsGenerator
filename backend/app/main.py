@@ -13,11 +13,14 @@ from app.services.ai_search import ai_search_service
 from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
 from app.services.openai_service import openai_service
+from app.utils.phi_sanitizer import PHISanitizingFilter
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
+# HIPAA: attach PHI-scrubbing filter to root logger
+logging.getLogger().addFilter(PHISanitizingFilter())
 logger = logging.getLogger(__name__)
 
 
