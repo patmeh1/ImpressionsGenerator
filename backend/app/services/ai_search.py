@@ -195,12 +195,12 @@ class AISearchService:
 
         if boost_high_rated and docs:
             # Re-rank: combine search relevance with style rating.
-            # Normalise search score (0-1 range) and blend with rating (1-5 → 0-1).
+            # Normalize search score (0-1 range) and blend with rating (1-5 → 0-1).
             max_score = max(d["score"] for d in docs) or 1.0
             for d in docs:
-                normalised_score = d["score"] / max_score
+                normalized_score = d["score"] / max_score
                 rating_boost = (d.get("style_rating") or 0) / 5.0
-                d["_combined"] = 0.7 * normalised_score + 0.3 * rating_boost
+                d["_combined"] = 0.7 * normalized_score + 0.3 * rating_boost
             docs.sort(key=lambda d: d["_combined"], reverse=True)
             for d in docs:
                 d.pop("_combined", None)
