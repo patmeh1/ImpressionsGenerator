@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getReport, updateReport, getReportVersions } from '@/lib/api';
+import { getReport, updateReport, getReportVersions, approveReport, rejectReport } from '@/lib/api';
 import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
 import ReportEditor from '@/components/ReportEditor';
@@ -37,12 +37,16 @@ export default function ReviewPage() {
     load();
   }, [reportId]);
 
-  const handleStatusChange = async (status: 'approved' | 'rejected') => {
+  const handleStatusChange = async (status: 'final' | 'rejected') => {
     if (!report) return;
     setSaving(true);
     try {
-      const updated = await updateReport(report.id, { status });
+      const updated = status === 'final'
+        ? await approveReport(report.id)
+        : await rejectReport(report.id);
       setReport(updated);
+      const v = await getReportVersions(reportId).catch(() => []);
+      setVersions(v);
     } catch (err) {
       console.error(err);
     } finally {
@@ -96,8 +100,8 @@ export default function ReviewPage() {
             </button>
           )}
           <button
-            onClick={() => handleStatusChange('approved')}
-            disabled={saving || report.status === 'approved'}
+            onClick={() => handleStatusChange('final')}
+            disabled={saving || report.status === 'final'}
             className="btn-primary flex items-center gap-1.5 text-sm bg-green-600 hover:bg-green-700"
           >
             <CheckCircle size={14} /> Approve
@@ -138,17 +142,17 @@ export default function ReviewPage() {
               <p className="text-xs text-slate-500">No previous versions</p>
             ) : (
               <ul className="space-y-2">
-                {versions.map((v) => (
+                {versions.map((v, idx) => (
                   <li
-                    key={v.id}
+                    key={idx}
                     className="text-xs bg-slate-50 dark:bg-slate-900 rounded-lg p-2.5"
                   >
                     <div className="flex justify-between mb-1">
                       <span className="font-medium text-slate-700 dark:text-slate-300">
-                        v{v.version_number}
+                        v{v.version}
                       </span>
                       <span className="text-slate-400">
-                        {new Date(v.created_at).toLocaleDateString()}
+                        {new Date(v.edited_at).toLocaleDateString()}
                       </span>
                     </div>
                     <p className="text-slate-500 truncate">{v.edited_by}</p>
