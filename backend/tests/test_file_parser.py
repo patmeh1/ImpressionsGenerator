@@ -22,9 +22,6 @@ def _make_pdf(text: str) -> bytes:
     """Create a minimal in-memory PDF containing *text*."""
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
-    # Add text via annotation (simplest approach without reportlab)
-    writer.pages[0]
-    # We'll use a simpler approach: write text to stream
     buf = io.BytesIO()
     writer.write(buf)
     return buf.getvalue()
@@ -73,8 +70,6 @@ def _make_txt(text: str) -> bytes:
 # ---------------------------------------------------------------------------
 def test_pdf_text_extraction():
     """extract_text should pull text from a valid PDF."""
-    sample_text = "Normal CT abdomen findings"
-    _make_docx(sample_text)  # We'll test DOCX as a proxy since making valid PDFs is complex
     # Verify PDF validation works; test with a real DOCX for extraction
     # Test validation accepts .pdf
     validate_file("report.pdf", 1000)  # Should not raise
