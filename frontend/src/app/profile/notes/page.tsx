@@ -50,7 +50,7 @@ export default function NotesPage() {
     if (!pasteText.trim()) return;
     setPasting(true);
     try {
-      await uploadNoteText(doctorId, pasteText, pasteName || 'pasted-note.txt');
+      await uploadNoteText(doctorId, pasteText);
       setPasteText('');
       setPasteName('');
       loadNotes();

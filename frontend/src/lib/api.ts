@@ -89,7 +89,7 @@ export async function uploadNote(
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes/upload`, {
+  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -100,13 +100,19 @@ export async function uploadNote(
 
 export async function uploadNoteText(
   doctorId: string,
-  content: string,
-  filename: string
+  content: string
 ): Promise<Note> {
-  return request<Note>(`/doctors/${doctorId}/notes`, {
+  const token = await getAccessToken();
+  const formData = new FormData();
+  formData.append('content', content);
+
+  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes`, {
     method: 'POST',
-    body: JSON.stringify({ content, filename }),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
+  if (!res.ok) throw new Error(`Failed to save note: ${res.status}`);
+  return res.json();
 }
 
 export async function deleteNote(

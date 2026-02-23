@@ -13,21 +13,15 @@ interface NotesListProps {
   onPageChange?: (page: number) => void;
 }
 
-function fileIcon(fileType: string) {
-  switch (fileType) {
-    case 'application/pdf':
-      return <FileType size={18} className="text-red-500" />;
-    case 'text/plain':
+function noteIcon(sourceType: string) {
+  switch (sourceType) {
+    case 'upload':
+      return <FileType size={18} className="text-blue-500" />;
+    case 'paste':
       return <FileText size={18} className="text-slate-500" />;
     default:
-      return <FileText size={18} className="text-blue-500" />;
+      return <FileText size={18} className="text-slate-500" />;
   }
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function NotesList({
@@ -63,17 +57,17 @@ export default function NotesList({
       <ul className="divide-y divide-slate-200 dark:divide-slate-700">
         {notes.map((note) => (
           <li key={note.id} className="py-3 flex items-start gap-3 group">
-            <div className="mt-0.5">{fileIcon(note.file_type)}</div>
+            <div className="mt-0.5">{noteIcon(note.source_type)}</div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
-                {note.filename}
+                {note.file_name || 'Pasted note'}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2">
                 {note.content.slice(0, 200)}
                 {note.content.length > 200 ? '...' : ''}
               </p>
               <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
-                <span>{formatBytes(note.file_size)}</span>
+                <span>{note.source_type}</span>
                 <span>{new Date(note.created_at).toLocaleDateString()}</span>
               </div>
             </div>
