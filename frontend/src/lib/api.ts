@@ -160,6 +160,18 @@ export async function updateReport(
   });
 }
 
+export async function approveReport(id: string): Promise<Report> {
+  return request<Report>(`/reports/${id}/approve`, {
+    method: 'POST',
+  });
+}
+
+export async function rejectReport(id: string): Promise<Report> {
+  return request<Report>(`/reports/${id}/reject`, {
+    method: 'POST',
+  });
+}
+
 export async function getReportVersions(
   reportId: string
 ): Promise<ReportVersion[]> {

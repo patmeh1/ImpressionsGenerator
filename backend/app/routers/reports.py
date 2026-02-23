@@ -70,6 +70,22 @@ async def approve_report(
     return approved
 
 
+@router.post("/{report_id}/reject", response_model=ReportResponse)
+async def reject_report(
+    report_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Mark a report as rejected."""
+    report = await _find_report(report_id, user)
+    rejected = await cosmos_service.reject_report(
+        report_id=report_id,
+        doctor_id=report["doctor_id"],
+    )
+    if not rejected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    return rejected
+
+
 @router.get("/{report_id}/versions")
 async def get_report_versions(
     report_id: str,

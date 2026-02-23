@@ -27,7 +27,7 @@ export interface Report {
   findings: string;
   impressions: string;
   recommendations: string;
-  status: 'draft' | 'approved' | 'rejected';
+  status: 'draft' | 'edited' | 'final' | 'approved' | 'rejected';
   created_at: string;
   updated_at: string;
 }
