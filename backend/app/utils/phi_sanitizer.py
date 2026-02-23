@@ -9,9 +9,8 @@ import re
 
 # Patterns that may indicate PHI in log messages
 _PHI_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    # SSN: 123-45-6789 or 123456789
+    # SSN: 123-45-6789
     (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[REDACTED-SSN]"),
-    (re.compile(r"\b\d{9}\b"), "[REDACTED-ID]"),
     # MRN / Medical Record Number (common 6-10 digit formats)
     (re.compile(r"\bMRN[:\s#]*\d{4,10}\b", re.IGNORECASE), "[REDACTED-MRN]"),
     # Phone numbers: (123) 456-7890, 123-456-7890, 123.456.7890
@@ -34,12 +33,12 @@ class PHISanitizingFilter(logging.Filter):
         if record.args:
             if isinstance(record.args, dict):
                 record.args = {
-                    k: sanitize_phi(str(v)) if isinstance(v, str) else v
+                    k: sanitize_phi(v) if isinstance(v, str) else v
                     for k, v in record.args.items()
                 }
             elif isinstance(record.args, tuple):
                 record.args = tuple(
-                    sanitize_phi(str(a)) if isinstance(a, str) else a
+                    sanitize_phi(a) if isinstance(a, str) else a
                     for a in record.args
                 )
         return True
