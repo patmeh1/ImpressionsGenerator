@@ -331,9 +331,11 @@ class CosmosDBService:
         items = list(self._container(container_name).query_items(
             query=query, parameters=params, enable_cross_partition_query=True
         ))
+        # Determine partition key based on container configuration
+        uses_doctor_id_pk = container_name in ("notes", "reports", "style_profiles")
         count = 0
         for item in items:
-            pk = item.get("doctor_id", item["id"])
+            pk = item.get("doctor_id", item["id"]) if uses_doctor_id_pk else item["id"]
             try:
                 self._container(container_name).delete_item(
                     item=item["id"], partition_key=pk
