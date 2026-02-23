@@ -126,6 +126,7 @@ class GenerationService:
                 report_type=report_type or None,
                 body_region=body_region or None,
                 top=3,
+                boost_high_rated=True,
             )
             logger.info("Retrieved %d few-shot examples", len(examples))
             return examples

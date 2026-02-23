@@ -6,7 +6,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import get_current_user
+from app.models.feedback import FeedbackCreate, FeedbackResponse
 from app.models.report import ReportResponse, ReportUpdate
+from app.services.ai_search import ai_search_service
 from app.services.cosmos_db import cosmos_service
 
 logger = logging.getLogger(__name__)
@@ -78,6 +80,41 @@ async def get_report_versions(
     """Get version history for a report."""
     report = await _find_report(report_id, user)
     return report.get("versions", [])
+
+
+@router.post("/{report_id}/feedback", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    report_id: str,
+    body: FeedbackCreate,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Submit a style accuracy rating for a generated report."""
+    report = await _find_report(report_id, user)
+    feedback = await cosmos_service.create_feedback(
+        report_id=report_id,
+        doctor_id=report["doctor_id"],
+        data=body.model_dump(),
+    )
+    # Best-effort: update the search index with the rating so future
+    # RAG retrieval can weight this report higher/lower.
+    try:
+        await ai_search_service.update_document_rating(
+            doc_id=report_id,
+            style_rating=float(body.rating),
+        )
+    except Exception as e:
+        logger.warning("Failed to update search index rating for report %s: %s", report_id, e)
+    return feedback
+
+
+@router.get("/{report_id}/feedback", response_model=list[FeedbackResponse])
+async def get_report_feedback(
+    report_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """Get all feedback for a report."""
+    await _find_report(report_id, user)
+    return await cosmos_service.get_feedback_for_report(report_id)
 
 
 async def _find_report(report_id: str, user: dict[str, Any]) -> dict[str, Any]:
