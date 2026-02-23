@@ -12,7 +12,7 @@ const connectionString =
 let appInsights: ApplicationInsights | null = null;
 
 /**
- * Initialise Application Insights.
+ * Initialize Application Insights.
  * Call once at app startup (e.g. in _app.tsx or a root layout).
  * No-ops when the connection string is not configured.
  */
