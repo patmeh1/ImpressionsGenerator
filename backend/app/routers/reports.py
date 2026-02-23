@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import get_current_user
 from app.models.report import ReportResponse, ReportUpdate
+from app.services.audit import audit_service
 from app.services.cosmos_db import cosmos_service
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ async def list_reports(
     user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     """List reports. Admins see all; doctors see only their own."""
+    audit_service.log_data_access(user, "report", "", "list")
     if "Admin" in user.get("roles", []):
         return await cosmos_service.list_reports(doctor_id=doctor_id)
     else:
@@ -32,6 +34,7 @@ async def get_report(
 ) -> dict[str, Any]:
     """Get a specific report."""
     report = await _find_report(report_id, user)
+    audit_service.log_data_access(user, "report", report_id, "read")
     return report
 
 
@@ -51,6 +54,9 @@ async def update_report(
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    audit_service.log_admin_action(
+        user, "update", "report", report_id, details="report_edited",
+    )
     return updated
 
 
@@ -67,6 +73,9 @@ async def approve_report(
     )
     if not approved:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    audit_service.log_admin_action(
+        user, "approve", "report", report_id, details="report_approved",
+    )
     return approved
 
 
@@ -77,6 +86,7 @@ async def get_report_versions(
 ) -> list[dict[str, Any]]:
     """Get version history for a report."""
     report = await _find_report(report_id, user)
+    audit_service.log_data_access(user, "report_versions", report_id, "read")
     return report.get("versions", [])
 
 

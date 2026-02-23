@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import admin, doctors, generate, notes, reports
 from app.services.ai_search import ai_search_service
+from app.services.audit import audit_service
 from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
 from app.services.openai_service import openai_service
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize Azure service clients on startup."""
     logger.info("Initializing Azure service clients...")
+    audit_service.configure(settings.APPINSIGHTS_CONNECTION_STRING)
     try:
         await cosmos_service.initialize()
         await blob_service.initialize()

@@ -12,6 +12,7 @@ PyPDF2
 pydantic
 pydantic-settings
 httpx
+opencensus-ext-azure
 pytest
 pytest-asyncio
 pytest-cov
