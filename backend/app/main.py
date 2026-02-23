@@ -1,10 +1,11 @@
 """FastAPI application entry point."""
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -12,6 +13,7 @@ from app.routers import admin, doctors, generate, notes, reports
 from app.services.ai_search import ai_search_service
 from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
+from app.services.monitoring import monitoring_service
 from app.services.openai_service import openai_service
 
 logging.basicConfig(
@@ -24,6 +26,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize Azure service clients on startup."""
+    # Initialize telemetry first so spans cover service init
+    monitoring_service.initialize()
+
     logger.info("Initializing Azure service clients...")
     try:
         await cosmos_service.initialize()
@@ -60,6 +65,23 @@ app.include_router(notes.router)
 app.include_router(generate.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
+
+
+# --- Request telemetry middleware ---
+@app.middleware("http")
+async def telemetry_middleware(request: Request, call_next) -> Response:
+    """Track request duration and status for Azure Monitor."""
+    start = time.time()
+    response: Response = await call_next(request)
+    duration_ms = (time.time() - start) * 1000
+    logger.info(
+        "Request %s %s → %s (%.1fms)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+    )
+    return response
 
 
 @app.get("/health", tags=["health"])
