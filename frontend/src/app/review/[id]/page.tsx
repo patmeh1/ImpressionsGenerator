@@ -6,7 +6,7 @@ import { getReport, updateReport, approveReport, rejectReport, getReportVersions
 import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
 import ReportEditor from '@/components/ReportEditor';
-import { CheckCircle, XCircle, Edit3, History, Loader2, Save } from 'lucide-react';
+import { CheckCircle, XCircle, Edit3, History, Loader2 } from 'lucide-react';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -78,22 +78,6 @@ export default function ReviewPage() {
       setSaving(false);
     }
   }, [report, reportId]);
-
-  // Ctrl+S keyboard shortcut to save draft
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (editing && report) {
-          // Trigger save via form submission - the ReportEditor's save button
-          const saveButton = document.querySelector('[data-testid="save-draft-btn"]') as HTMLButtonElement | null;
-          saveButton?.click();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editing, report]);
 
   if (loading) {
     return (
