@@ -84,8 +84,8 @@ class TestVariousMeasurementTypes:
         _assert_grounded(result)
 
     def test_suv_values(self):
-        inp = "FDG-avid lesion with SUV max of 8.5 SUV."
-        out = "The lesion demonstrates avid uptake with 8.5 SUV."
+        inp = "FDG-avid lesion with SUVmax of 8.5 SUV."
+        out = "The lesion demonstrates avid uptake, 8.5 SUV."
         result = validate_grounding(inp, out)
         _assert_grounded(result)
 
@@ -218,12 +218,12 @@ class TestMultipleMeasurements:
     def test_mixed_measurement_types_all_preserved(self):
         inp = (
             "Lung nodule 8 mm. Pleural effusion 200 mL. "
-            "Ejection fraction 55%. Lesion SUV 6.2 SUV. "
+            "Ejection fraction 55%. Lesion SUVmax 6.2 SUV. "
             "Adrenal density 10 HU. Contrast dose 120 mg."
         )
         out = (
             "8 mm lung nodule. Pleural effusion of 200 mL. "
-            "EF is 55%. Lesion SUV of 6.2 SUV. "
+            "EF is 55%. Lesion SUVmax 6.2 SUV. "
             "Adrenal density 10 HU. 120 mg contrast administered."
         )
         result = validate_grounding(inp, out)
