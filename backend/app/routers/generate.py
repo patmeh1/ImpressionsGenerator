@@ -54,11 +54,11 @@ async def generate_report(
             detail="An unexpected error occurred during report generation",
         ) from e
 
-    output_text = " ".join([
+    output_text = "\n".join(filter(None, [
         report.get("findings", ""),
         report.get("impressions", ""),
         report.get("recommendations", ""),
-    ])
+    ]))
     audit_service.log_generation(
         user=user,
         doctor_id=body.doctor_id,
