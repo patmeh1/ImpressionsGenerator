@@ -17,6 +17,7 @@ from azure.search.documents.indexes.models import (
     VectorSearchProfile,
 )
 from azure.search.documents.models import VectorizedQuery
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import AzureOpenAI
 
 from app.config import settings
@@ -43,9 +44,13 @@ class AzureAISearchService:
             credential=credential,
         )
 
+        azure_credential = DefaultAzureCredential()
+        token_provider = get_bearer_token_provider(
+            azure_credential, "https://cognitiveservices.azure.com/.default"
+        )
         self._openai_client = AzureOpenAI(
             azure_endpoint=settings.OPENAI_ENDPOINT,
-            api_key=settings.AI_SEARCH_API_KEY,
+            azure_ad_token_provider=token_provider,
             api_version=settings.OPENAI_API_VERSION,
         )
 

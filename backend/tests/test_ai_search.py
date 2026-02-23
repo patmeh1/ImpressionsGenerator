@@ -104,12 +104,7 @@ async def test_index_note_generates_embedding():
     assert len(doc["embedding"]) == VECTOR_DIMENSIONS
 
     # Document should have been uploaded
-    svc._search_client.upload_documents.assert_called_once()
-    uploaded = svc._search_client.upload_documents.call_args.kwargs.get("documents")
-    if uploaded is None:
-        uploaded = svc._search_client.upload_documents.call_args[1].get("documents")
-    if uploaded is None:
-        uploaded = svc._search_client.upload_documents.call_args[0][0]
+    svc._search_client.upload_documents.assert_called_once_with(documents=[doc])
 
 
 @pytest.mark.asyncio
@@ -133,15 +128,11 @@ async def test_index_report_generates_embedding():
     svc._openai_client.embeddings.create.assert_called_once()
     svc._search_client.upload_documents.assert_called_once()
 
-    uploaded_docs = svc._search_client.upload_documents.call_args
-    doc = uploaded_docs.kwargs.get("documents", uploaded_docs[1].get("documents", [None]))[0]
-    if doc is None:
-        doc = uploaded_docs[0][0]
-
-    assert doc["id"] == "report-001"
-    assert doc["doctor_id"] == "doctor-001"
-    assert "embedding" in doc
-    assert len(doc["embedding"]) == VECTOR_DIMENSIONS
+    uploaded_doc = svc._search_client.upload_documents.call_args.kwargs["documents"][0]
+    assert uploaded_doc["id"] == "report-001"
+    assert uploaded_doc["doctor_id"] == "doctor-001"
+    assert "embedding" in uploaded_doc
+    assert len(uploaded_doc["embedding"]) == VECTOR_DIMENSIONS
 
 
 # ---------------------------------------------------------------------------
