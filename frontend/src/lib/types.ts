@@ -81,3 +81,13 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
 }
+
+export interface RetentionPolicy {
+  id: string;
+  reports_retention_days: number;
+  notes_retention_days: number;
+  audit_logs_retention_days: number;
+  soft_delete_grace_period_days: number;
+  updated_at: string;
+  updated_by?: string;
+}

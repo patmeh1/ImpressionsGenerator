@@ -9,6 +9,7 @@ import type {
   ReportVersion,
   UsageStatsData,
   PaginatedResponse,
+  RetentionPolicy,
 } from '@/lib/types';
 
 const BASE_URL = '/api';
@@ -182,4 +183,18 @@ export async function getDoctorStats(
   doctorId: string
 ): Promise<UsageStatsData> {
   return request<UsageStatsData>(`/admin/doctors/${doctorId}/stats`);
+}
+
+// Retention Policy
+export async function getRetentionPolicy(): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy');
+}
+
+export async function updateRetentionPolicy(
+  data: Partial<RetentionPolicy>
+): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }
