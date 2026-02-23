@@ -34,7 +34,8 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   }
 
   if (requiredRole) {
-    const claims = accounts[0]?.idTokenClaims as Record<string, unknown> | undefined;
+    const account = accounts.length > 0 ? accounts[0] : null;
+    const claims = account?.idTokenClaims as Record<string, unknown> | undefined;
     const roles = (claims?.roles as string[]) || [];
     if (!roles.includes(requiredRole)) {
       return (
