@@ -131,7 +131,7 @@ test('T17: paste text, select report type, submit shows loading state', async ()
 
   // Resolve generation
   await act(async () => {
-    resolveGenerate!();
+    resolveGenerate();
   });
 
   // Loading state should be gone
@@ -210,6 +210,6 @@ test('Ctrl+Enter triggers generation', async () => {
   expect(onGenerate).toHaveBeenCalled();
 
   await act(async () => {
-    resolveGenerate!();
+    resolveGenerate();
   });
 });

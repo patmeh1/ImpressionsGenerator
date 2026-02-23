@@ -154,6 +154,7 @@ export default function GeneratePage() {
             onClick={handleGenerate}
             disabled={generating || !inputText.trim() || !selectedDoctorId}
             className="btn-primary flex items-center gap-2"
+            aria-keyshortcuts="Control+Enter"
           >
             {generating ? (
               <>
