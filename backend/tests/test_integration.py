@@ -521,7 +521,6 @@ class TestT25AuthEndToEnd:
 
         # Simulate token revocation (logout) — subsequent calls raise ValueError
         mock_validate.side_effect = ValueError("Token revoked")
-        mock_validate.return_value = None
 
         response = await client.get("/api/doctors/doctor-001")
         assert response.status_code == 401
