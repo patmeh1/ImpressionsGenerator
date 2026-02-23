@@ -180,13 +180,29 @@ def test_style_profile_defaults():
 @pytest.mark.asyncio
 async def test_style_reextraction_on_note_removal(monkeypatch):
     """Removing a note should trigger style re-extraction for the doctor."""
+    from app.services.cosmos_db import cosmos_service
+    from app.services.ai_search import ai_search_service
     from app.services.style_extraction import style_extraction_service
 
+    note = {
+        "id": "note-001",
+        "doctor_id": "doctor-001",
+        "content": "CT Abdomen: Liver unremarkable.",
+        "file_name": None,
+    }
+
+    monkeypatch.setattr(cosmos_service, "get_note", AsyncMock(return_value=note))
+    monkeypatch.setattr(cosmos_service, "delete_note", AsyncMock(return_value=True))
+    monkeypatch.setattr(ai_search_service, "delete_document", AsyncMock())
     extract_mock = AsyncMock(return_value=StyleProfile(doctor_id="doctor-001"))
     monkeypatch.setattr(style_extraction_service, "extract_style", extract_mock)
 
-    # Simulate a note deletion triggering re-extraction
-    await style_extraction_service.extract_style("doctor-001")
+    from app.routers.notes import delete_note
+
+    # Patch auth check to be a no-op
+    monkeypatch.setattr("app.routers.notes._enforce_note_access", lambda u, d: None)
+    await delete_note(doctor_id="doctor-001", note_id="note-001", user={"user_id": "doctor-001", "roles": ["Doctor"]})
+
     extract_mock.assert_awaited_once_with("doctor-001")
 
 
