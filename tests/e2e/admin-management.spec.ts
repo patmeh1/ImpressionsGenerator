@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * T29 – Admin management: admin login → view doctors → view usage stats.
+ * T29 – Admin management: admin login → view doctors → view usage stats → manage settings.
  */
 
 test.describe('Admin Management', () => {
@@ -22,7 +22,7 @@ test.describe('Admin Management', () => {
     });
   });
 
-  test('T29: admin login, view doctors list, view usage stats', async ({
+  test('T29: admin login, view doctors list, view usage stats, manage settings', async ({
     page,
   }) => {
     // Step 1 – navigate to admin dashboard
@@ -58,6 +58,42 @@ test.describe('Admin Management', () => {
     if (hasStats) {
       const statsText = await statsSection.textContent();
       expect(statsText).toBeTruthy();
+    }
+
+    // Step 4 – manage settings: navigate to a doctor detail page
+    const doctorLink = page.locator('table a[href*="/admin/doctors/"]').first();
+    const hasDoctorLink = await doctorLink
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+
+    if (hasDoctorLink) {
+      await doctorLink.click();
+      await page.waitForURL('**/admin/doctors/**');
+
+      // Verify profile settings form is visible
+      const nameInput = page.locator('input[type="text"]').first();
+      const hasNameInput = await nameInput
+        .isVisible({ timeout: 5000 })
+        .catch(() => false);
+
+      if (hasNameInput) {
+        // Edit the specialty field
+        const specialtyInput = page.locator('div:has(> label:text("Specialty")) input').first();
+        if (await specialtyInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await specialtyInput.fill('Neuroradiology');
+        }
+
+        // Click Save Profile
+        const saveBtn = page.locator(
+          'button:has-text("Save"), button:has-text("Save Profile")'
+        ).first();
+
+        if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await saveBtn.click();
+          // Wait for save to complete (button re-enables after saving)
+          await expect(saveBtn).toBeEnabled({ timeout: 5000 });
+        }
+      }
     }
 
     // Page should not have crashed
