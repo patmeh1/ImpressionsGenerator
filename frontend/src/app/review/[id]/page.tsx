@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getReport, updateReport, getReportVersions } from '@/lib/api';
+import { getReport, updateReport, approveReport, rejectReport, getReportVersions } from '@/lib/api';
 import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
 import ReportEditor from '@/components/ReportEditor';
-import { CheckCircle, XCircle, Edit3, History, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Edit3, History, Loader2, Save } from 'lucide-react';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -37,11 +37,11 @@ export default function ReviewPage() {
     load();
   }, [reportId]);
 
-  const handleStatusChange = async (status: 'approved' | 'rejected') => {
+  const handleApprove = async () => {
     if (!report) return;
     setSaving(true);
     try {
-      const updated = await updateReport(report.id, { status });
+      const updated = await approveReport(report.id);
       setReport(updated);
     } catch (err) {
       console.error(err);
@@ -50,7 +50,20 @@ export default function ReviewPage() {
     }
   };
 
-  const handleSave = async (data: { findings: string; impressions: string; recommendations: string }) => {
+  const handleReject = async () => {
+    if (!report) return;
+    setSaving(true);
+    try {
+      await rejectReport(report.id);
+      router.push('/generate');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = useCallback(async (data: { findings: string; impressions: string; recommendations: string }) => {
     if (!report) return;
     setSaving(true);
     try {
@@ -64,7 +77,23 @@ export default function ReviewPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [report, reportId]);
+
+  // Ctrl+S keyboard shortcut to save draft
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (editing && report) {
+          // Trigger save via form submission - the ReportEditor's save button
+          const saveButton = document.querySelector('[data-testid="save-draft-btn"]') as HTMLButtonElement | null;
+          saveButton?.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editing, report]);
 
   if (loading) {
     return (
@@ -96,14 +125,14 @@ export default function ReviewPage() {
             </button>
           )}
           <button
-            onClick={() => handleStatusChange('approved')}
-            disabled={saving || report.status === 'approved'}
+            onClick={handleApprove}
+            disabled={saving || report.status === 'final'}
             className="btn-primary flex items-center gap-1.5 text-sm bg-green-600 hover:bg-green-700"
           >
             <CheckCircle size={14} /> Approve
           </button>
           <button
-            onClick={() => handleStatusChange('rejected')}
+            onClick={handleReject}
             disabled={saving || report.status === 'rejected'}
             className="btn-danger flex items-center gap-1.5 text-sm"
           >

@@ -58,9 +58,9 @@ export default function ReportEditor({ report, onSave, onCancel }: ReportEditorP
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={handleSave} className="btn-primary flex items-center gap-2">
+        <button onClick={handleSave} data-testid="save-draft-btn" className="btn-primary flex items-center gap-2">
           <Save size={16} />
-          Save Changes
+          Save Draft
         </button>
         <button onClick={onCancel} className="btn-secondary flex items-center gap-2">
           <XCircle size={16} />
