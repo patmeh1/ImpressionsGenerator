@@ -38,7 +38,7 @@ export default function AdminPage() {
   const filtered = doctors.filter(
     (d) =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
-      d.email.toLowerCase().includes(search.toLowerCase())
+      d.specialty.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -105,20 +105,19 @@ export default function AdminPage() {
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Name</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Specialty</th>
-                <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Role</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Department</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">Joined</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">Loading...</td>
+                  <td colSpan={4} className="px-4 py-8 text-center text-slate-500">Loading...</td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-slate-500">No doctors found</td>
+                  <td colSpan={4} className="px-4 py-8 text-center text-slate-500">No doctors found</td>
                 </tr>
               ) : (
                 filtered.map((doc) => (
@@ -131,17 +130,8 @@ export default function AdminPage() {
                         {doc.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{doc.email}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{doc.specialty}</td>
-                    <td className="px-4 py-3">
-                      {doc.is_admin ? (
-                        <span className="px-2 py-0.5 bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 rounded-full text-xs font-medium">
-                          Admin
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-xs">User</span>
-                      )}
-                    </td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{doc.department}</td>
                     <td className="px-4 py-3 text-slate-500 text-xs">
                       {new Date(doc.created_at).toLocaleDateString()}
                     </td>

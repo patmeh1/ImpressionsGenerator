@@ -55,10 +55,12 @@ class CosmosDBService:
     # --- Doctor operations ---
 
     async def create_doctor(self, data: dict[str, Any]) -> dict[str, Any]:
+        now = datetime.utcnow().isoformat()
         doc = {
             "id": str(uuid.uuid4()),
             **data,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": now,
+            "updated_at": now,
         }
         self._container("doctors").create_item(body=doc)
         logger.info("Created doctor %s", doc["id"])
@@ -85,6 +87,7 @@ class CosmosDBService:
         if existing is None:
             return None
         existing.update({k: v for k, v in data.items() if v is not None})
+        existing["updated_at"] = datetime.utcnow().isoformat()
         self._container("doctors").replace_item(item=doctor_id, body=existing)
         logger.info("Updated doctor %s", doctor_id)
         return existing

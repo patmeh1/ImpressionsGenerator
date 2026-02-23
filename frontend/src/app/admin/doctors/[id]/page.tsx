@@ -29,9 +29,8 @@ export default function DoctorDetailPage() {
 
   // Editable fields
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [specialty, setSpecialty] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [department, setDepartment] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -44,9 +43,8 @@ export default function DoctorDetailPage() {
         ]);
         setDoctor(doc);
         setName(doc.name);
-        setEmail(doc.email);
         setSpecialty(doc.specialty);
-        setIsAdmin(doc.is_admin);
+        setDepartment(doc.department);
         setNotes(notesRes.items);
         setStyleProfile(sp);
         setStats(st);
@@ -62,7 +60,7 @@ export default function DoctorDetailPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await updateDoctor(doctorId, { name, email, specialty, is_admin: isAdmin });
+      const updated = await updateDoctor(doctorId, { name, specialty, department });
       setDoctor(updated);
     } catch (err) {
       console.error(err);
@@ -114,15 +112,6 @@ export default function DoctorDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field"
-            />
-          </div>
-          <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Specialty</label>
             <input
               type="text"
@@ -131,16 +120,14 @@ export default function DoctorDetailPage() {
               className="input-field"
             />
           </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={isAdmin}
-                onChange={(e) => setIsAdmin(e.target.checked)}
-                className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-              />
-              Admin role
-            </label>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Department</label>
+            <input
+              type="text"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              className="input-field"
+            />
           </div>
         </div>
         <div className="mt-4">
