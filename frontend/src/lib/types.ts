@@ -81,3 +81,18 @@ export interface PaginatedResponse<T> {
   page: number;
   page_size: number;
 }
+
+export interface Feedback {
+  id: string;
+  report_id: string;
+  doctor_id: string;
+  rating: number;
+  feedback_text: string;
+  created_at: string;
+}
+
+export interface FeedbackScores {
+  doctor_id: string;
+  avg_rating: number;
+  total_feedback: number;
+}
