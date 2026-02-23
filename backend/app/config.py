@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # Azure Key Vault
     KEYVAULT_URL: str = ""
 
+    # Azure Monitor / Application Insights
+    APPINSIGHTS_CONNECTION_STRING: str = ""
+
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000"
 
