@@ -10,10 +10,9 @@ export interface Doctor {
 export interface Note {
   id: string;
   doctor_id: string;
-  filename: string;
   content: string;
-  file_type: string;
-  file_size: number;
+  source_type: 'upload' | 'paste';
+  file_name: string | null;
   created_at: string;
 }
 

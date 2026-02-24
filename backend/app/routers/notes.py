@@ -12,7 +12,7 @@ from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
 from app.services.ai_search import ai_search_service
 from app.services.style_extraction import style_extraction_service
-from app.utils.file_parser import FileParserError, extract_text
+from app.utils.file_parser import FileParserError, FileTooLargeError, extract_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/doctors/{doctor_id}/notes", tags=["notes"])
@@ -37,6 +37,10 @@ async def create_note(
         file_content = await file.read()
         try:
             text = extract_text(file.filename, file_content)
+        except FileTooLargeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e)
+            ) from e
         except FileParserError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)

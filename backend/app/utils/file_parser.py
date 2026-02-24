@@ -16,10 +16,14 @@ class FileParserError(Exception):
     """Raised when file parsing fails."""
 
 
+class FileTooLargeError(FileParserError):
+    """Raised when file exceeds the maximum allowed size."""
+
+
 def validate_file(file_name: str, file_size: int) -> None:
     """Validate file size and extension."""
     if file_size > MAX_FILE_SIZE:
-        raise FileParserError(
+        raise FileTooLargeError(
             f"File size {file_size} bytes exceeds maximum of {MAX_FILE_SIZE} bytes (10 MB)"
         )
 
