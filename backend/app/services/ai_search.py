@@ -9,6 +9,7 @@ from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import (
     HnswAlgorithmConfiguration,
     SearchableField,
+    SearchField,
     SearchFieldDataType,
     SearchIndex,
     SimpleField,
@@ -127,6 +128,12 @@ class AzureAISearchService:
                 vector_search_dimensions=VECTOR_DIMENSIONS,
                 vector_search_profile_name="default-vector-profile",
             ),
+            SimpleField(
+                name="style_rating",
+                type=SearchFieldDataType.Double,
+                filterable=True,
+                sortable=True,
+            ),
         ]
 
         vector_search = VectorSearch(
@@ -194,6 +201,7 @@ class AzureAISearchService:
             "recommendations": report.get("recommendations", ""),
             "created_at": report.get("created_at", ""),
             "embedding": embedding,
+            "style_rating": float(report.get("style_rating", 0)),
         }
         self._search_client.upload_documents(documents=[doc])
         logger.info("Indexed report '%s' with embedding", report["id"])
@@ -205,12 +213,15 @@ class AzureAISearchService:
         report_type: str | None = None,
         body_region: str | None = None,
         top: int = 5,
+        boost_high_rated: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Search for similar notes by a specific doctor using vector similarity.
 
         Generates an embedding for the query text and performs a hybrid search
         (vector + keyword) filtered by doctor_id for style isolation.
+        When boost_high_rated is True, results are re-ranked so higher-rated
+        notes appear first.
         """
         if self._search_client is None:
             raise RuntimeError("AzureAISearchService not initialized")
@@ -223,6 +234,9 @@ class AzureAISearchService:
 
         filter_expr = " and ".join(filter_parts)
 
+        # Fetch extra candidates when boosting so re-ranking has more to work with
+        fetch_top = top * 2 if boost_high_rated else top
+
         query_embedding = self._generate_embedding(query_text)
         vector_query = VectorizedQuery(
             vector=query_embedding,
@@ -234,9 +248,9 @@ class AzureAISearchService:
             search_text=query_text,
             vector_queries=[vector_query],
             filter=filter_expr,
-            top=top,
+            top=fetch_top,
             select=["id", "content", "findings", "impressions", "recommendations",
-                    "report_type", "body_region"],
+                    "report_type", "body_region", "style_rating"],
         )
 
         docs = []
@@ -250,13 +264,37 @@ class AzureAISearchService:
                 "report_type": result.get("report_type", ""),
                 "body_region": result.get("body_region", ""),
                 "score": result.get("@search.score", 0),
+                "style_rating": result.get("style_rating", 0),
             })
+
+        if boost_high_rated and docs:
+            # Re-rank: combine search relevance with style rating.
+            # Normalize search score (0-1 range) and blend with rating (1-5 → 0-1).
+            max_score = max(d["score"] for d in docs) or 1.0
+            for d in docs:
+                normalized_score = d["score"] / max_score
+                rating_boost = (d.get("style_rating") or 0) / 5.0
+                d["_combined"] = 0.7 * normalized_score + 0.3 * rating_boost
+            docs.sort(key=lambda d: d["_combined"], reverse=True)
+            for d in docs:
+                d.pop("_combined", None)
+            docs = docs[:top]
 
         logger.info(
             "Found %d similar notes for doctor %s (query: %.50s...)",
             len(docs), doctor_id, query_text,
         )
         return docs
+
+    async def update_document_rating(self, doc_id: str, style_rating: float) -> None:
+        """Update the style_rating field on an indexed document."""
+        if self._search_client is None:
+            raise RuntimeError("AISearchService not initialized")
+
+        self._search_client.merge_documents(
+            documents=[{"id": doc_id, "style_rating": style_rating}]
+        )
+        logger.info("Updated style_rating for document '%s' to %.1f", doc_id, style_rating)
 
     async def delete_document(self, doc_id: str) -> None:
         """Delete a document from the search index."""

@@ -9,6 +9,8 @@ import type {
   ReportVersion,
   UsageStatsData,
   PaginatedResponse,
+  Feedback,
+  FeedbackScores,
 } from '@/lib/types';
 
 const BASE_URL = '/api';
@@ -200,4 +202,27 @@ export async function getDoctorStats(
   doctorId: string
 ): Promise<UsageStatsData> {
   return request<UsageStatsData>(`/admin/doctors/${doctorId}/stats`);
+}
+
+export async function getDoctorFeedbackScores(
+  doctorId: string
+): Promise<FeedbackScores> {
+  return request<FeedbackScores>(`/admin/doctors/${doctorId}/feedback-scores`);
+}
+
+// Feedback
+export async function submitFeedback(
+  reportId: string,
+  data: { rating: number; feedback_text?: string }
+): Promise<Feedback> {
+  return request<Feedback>(`/reports/${reportId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getReportFeedback(
+  reportId: string
+): Promise<Feedback[]> {
+  return request<Feedback[]>(`/reports/${reportId}/feedback`);
 }

@@ -38,6 +38,7 @@ class CosmosDBService:
             ("notes", "/doctor_id"),
             ("reports", "/doctor_id"),
             ("style_profiles", "/doctor_id"),
+            ("feedback", "/report_id"),
         ]
         for name, pk_path in container_configs:
             self._containers[name] = self._database.create_container_if_not_exists(
@@ -245,6 +246,65 @@ class CosmosDBService:
         self._container("style_profiles").upsert_item(body=data)
         logger.info("Upserted style profile for doctor %s", data.get("doctor_id"))
         return data
+
+    # --- Feedback operations ---
+
+    async def create_feedback(
+        self, report_id: str, doctor_id: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        doc = {
+            "id": str(uuid.uuid4()),
+            "report_id": report_id,
+            "doctor_id": doctor_id,
+            **data,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._container("feedback").create_item(body=doc)
+        logger.info("Created feedback %s for report %s", doc["id"], report_id)
+        return doc
+
+    async def get_feedback_for_report(self, report_id: str) -> list[dict[str, Any]]:
+        query = "SELECT * FROM c WHERE c.report_id = @report_id ORDER BY c.created_at DESC"
+        params = [{"name": "@report_id", "value": report_id}]
+        return list(self._container("feedback").query_items(
+            query=query, parameters=params, partition_key=report_id
+        ))
+
+    async def get_average_rating_for_doctor(self, doctor_id: str) -> dict[str, Any]:
+        query = (
+            "SELECT VALUE {"
+            "'avg_rating': AVG(c.rating), "
+            "'total_feedback': COUNT(1)"
+            "} FROM c WHERE c.doctor_id = @doctor_id"
+        )
+        params = [{"name": "@doctor_id", "value": doctor_id}]
+        results = list(self._container("feedback").query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        if results and results[0]:
+            return {
+                "doctor_id": doctor_id,
+                "avg_rating": results[0].get("avg_rating") or 0,
+                "total_feedback": results[0].get("total_feedback", 0),
+            }
+        return {"doctor_id": doctor_id, "avg_rating": 0, "total_feedback": 0}
+
+    async def get_high_rated_report_ids(
+        self, doctor_id: str, min_rating: int = 4
+    ) -> list[str]:
+        """Return report IDs that received high style ratings from a doctor."""
+        query = (
+            "SELECT c.report_id FROM c "
+            "WHERE c.doctor_id = @doctor_id AND c.rating >= @min_rating"
+        )
+        params = [
+            {"name": "@doctor_id", "value": doctor_id},
+            {"name": "@min_rating", "value": min_rating},
+        ]
+        items = list(self._container("feedback").query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        return [item["report_id"] for item in items]
 
     # --- Admin statistics ---
 

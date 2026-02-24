@@ -10,12 +10,13 @@ import {
   deleteNote,
   getStyleProfile,
   getDoctorStats,
+  getDoctorFeedbackScores,
 } from '@/lib/api';
-import type { Doctor, Note, StyleProfile as StyleProfileType, UsageStatsData } from '@/lib/types';
+import type { Doctor, Note, StyleProfile as StyleProfileType, UsageStatsData, FeedbackScores } from '@/lib/types';
 import NotesList from '@/components/NotesList';
 import StylePreview from '@/components/StylePreview';
 import UsageStats from '@/components/UsageStats';
-import { User, Save, Loader2 } from 'lucide-react';
+import { User, Save, Loader2, Star } from 'lucide-react';
 
 export default function DoctorDetailPage() {
   const params = useParams();
@@ -25,6 +26,7 @@ export default function DoctorDetailPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [styleProfile, setStyleProfile] = useState<StyleProfileType | null>(null);
   const [stats, setStats] = useState<UsageStatsData | null>(null);
+  const [feedbackScores, setFeedbackScores] = useState<FeedbackScores | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -36,11 +38,12 @@ export default function DoctorDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [doc, notesRes, sp, st] = await Promise.all([
+        const [doc, notesRes, sp, st, fb] = await Promise.all([
           getDoctor(doctorId),
           getNotes(doctorId, 1, 10),
           getStyleProfile(doctorId).catch(() => null),
           getDoctorStats(doctorId).catch(() => null),
+          getDoctorFeedbackScores(doctorId).catch(() => null),
         ]);
         setDoctor(doc);
         setName(doc.name);
@@ -49,6 +52,7 @@ export default function DoctorDetailPage() {
         setNotes(notesRes.items);
         setStyleProfile(sp);
         setStats(st);
+        setFeedbackScores(fb);
       } catch (err) {
         console.error(err);
       } finally {
@@ -156,6 +160,45 @@ export default function DoctorDetailPage() {
 
       {/* Usage Stats */}
       {stats && <UsageStats stats={stats} />}
+
+      {/* Style Quality Scores */}
+      {feedbackScores && feedbackScores.total_feedback > 0 && (
+        <div className="card p-5">
+          <h2 className="section-heading mb-3 flex items-center gap-2">
+            <Star size={18} className="text-yellow-500" />
+            Style Quality Scores
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
+              <p className="text-xs text-slate-500 mb-1">Average Rating</p>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                  {feedbackScores.avg_rating.toFixed(1)}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      size={16}
+                      className={
+                        star <= Math.round(feedbackScores.avg_rating)
+                          ? 'text-yellow-400 fill-yellow-400'
+                          : 'text-slate-300'
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4">
+              <p className="text-xs text-slate-500 mb-1">Total Feedback</p>
+              <span className="text-2xl font-bold text-slate-800 dark:text-slate-200">
+                {feedbackScores.total_feedback}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Style Profile */}
       {styleProfile && <StylePreview styleProfile={styleProfile} />}

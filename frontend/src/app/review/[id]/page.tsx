@@ -8,6 +8,7 @@ import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
 import ReportEditor from '@/components/ReportEditor';
 import { CheckCircle, XCircle, Edit3, History, Loader2 } from 'lucide-react';
+import StyleFeedback from '@/components/StyleFeedback';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -147,9 +148,13 @@ export default function ReviewPage() {
           )}
         </div>
 
-        {/* Version History Sidebar */}
+        {/* Sidebar */}
         <div className="xl:col-span-1">
-          <div className="card p-4">
+          {/* Style Feedback */}
+          <StyleFeedback reportId={reportId} />
+
+          {/* Version History */}
+          <div className="card p-4 mt-4">
             <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
               <History size={16} /> Version History
             </h3>
