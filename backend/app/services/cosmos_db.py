@@ -216,6 +216,18 @@ class CosmosDBService:
         logger.info("Approved report %s", report_id)
         return existing
 
+    async def reject_report(
+        self, report_id: str, doctor_id: str
+    ) -> dict[str, Any] | None:
+        existing = await self.get_report(report_id, doctor_id)
+        if existing is None:
+            return None
+        existing["status"] = "rejected"
+        existing["updated_at"] = datetime.utcnow().isoformat()
+        self._container("reports").replace_item(item=report_id, body=existing)
+        logger.info("Rejected report %s", report_id)
+        return existing
+
     # --- Style Profile operations ---
 
     async def get_style_profile(self, doctor_id: str) -> dict[str, Any] | None:

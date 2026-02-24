@@ -10,6 +10,7 @@ class ReportStatus(str, Enum):
     DRAFT = "draft"
     EDITED = "edited"
     FINAL = "final"
+    REJECTED = "rejected"
 
 
 class GenerateRequest(BaseModel):
