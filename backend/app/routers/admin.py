@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import require_role
 from app.models.retention_policy import RetentionPolicyResponse, RetentionPolicyUpdate
+from app.services.audit import audit_service
 from app.services.cosmos_db import cosmos_service
 from app.services.purge import run_purge
 
@@ -21,6 +22,7 @@ async def get_stats(
     user: dict[str, Any] = Depends(require_role("Admin")),
 ) -> dict[str, Any]:
     """Get overall system statistics. Admin only."""
+    audit_service.log_data_access(user, "stats", "", "read")
     stats = await cosmos_service.get_stats()
     return stats
 
@@ -30,6 +32,7 @@ async def list_doctors_with_stats(
     user: dict[str, Any] = Depends(require_role("Admin")),
 ) -> list[dict[str, Any]]:
     """List all doctors with their usage statistics. Admin only."""
+    audit_service.log_data_access(user, "doctors_stats", "", "list")
     return await cosmos_service.get_doctors_with_stats()
 
 
