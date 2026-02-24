@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user
 from app.models.report import GenerateRequest
-from app.services.generation import generation_service
+from app.services.generation import DoctorNotFoundError, generation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/generate", tags=["generate"])
@@ -39,10 +39,15 @@ async def generate_report(
             report_type=body.report_type,
             body_region=body.body_region,
         )
+    except DoctorNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except RuntimeError as e:
         logger.error("Report generation failed: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Report generation failed: {e}",
         ) from e
     except Exception as e:
