@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     OPENAI_ENDPOINT: str = ""
     OPENAI_API_VERSION: str = "2024-06-01"
     OPENAI_DEPLOYMENT_NAME: str = "gpt-4o"
+    OPENAI_EMBEDDING_DEPLOYMENT: str = "text-embedding-ada-002"
 
     # Azure AI Search
     AI_SEARCH_ENDPOINT: str = ""
