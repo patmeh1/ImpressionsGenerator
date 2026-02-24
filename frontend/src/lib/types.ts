@@ -1,11 +1,10 @@
 export interface Doctor {
   id: string;
   name: string;
-  email: string;
   specialty: string;
-  is_admin: boolean;
+  department: string;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 export interface Note {

@@ -29,6 +29,7 @@ SAMPLE_DOCTOR = {
     "specialty": "Radiology",
     "department": "Diagnostic Imaging",
     "created_at": datetime.utcnow().isoformat(),
+    "updated_at": datetime.utcnow().isoformat(),
 }
 
 SAMPLE_DOCTOR_B = {
@@ -37,6 +38,7 @@ SAMPLE_DOCTOR_B = {
     "specialty": "Cardiology",
     "department": "Heart Center",
     "created_at": datetime.utcnow().isoformat(),
+    "updated_at": datetime.utcnow().isoformat(),
 }
 
 SAMPLE_NOTE = {
