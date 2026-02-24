@@ -11,6 +11,7 @@ import type {
   PaginatedResponse,
   Feedback,
   FeedbackScores,
+  RetentionPolicy,
 } from '@/lib/types';
 
 const BASE_URL = '/api';
@@ -233,4 +234,18 @@ export async function getReportFeedback(
   reportId: string
 ): Promise<Feedback[]> {
   return request<Feedback[]>(`/reports/${reportId}/feedback`);
+}
+
+// Retention Policy
+export async function getRetentionPolicy(): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy');
+}
+
+export async function updateRetentionPolicy(
+  data: Partial<RetentionPolicy>
+): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }

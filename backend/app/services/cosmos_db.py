@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from azure.cosmos import ContainerProxy, CosmosClient, PartitionKey
@@ -39,6 +39,8 @@ class CosmosDBService:
             ("reports", "/doctor_id"),
             ("style_profiles", "/doctor_id"),
             ("feedback", "/report_id"),
+            ("retention_policies", "/id"),
+            ("audit_logs", "/id"),
         ]
         for name, pk_path in container_configs:
             self._containers[name] = self._database.create_container_if_not_exists(
@@ -358,6 +360,95 @@ class CosmosDBService:
             doctor["note_count"] = len(notes)
             doctor["report_count"] = len(reports)
         return doctors
+
+    # --- Retention policy operations ---
+
+    async def get_retention_policy(self) -> dict[str, Any] | None:
+        """Get the current retention policy (singleton document)."""
+        query = "SELECT * FROM c WHERE c.id = 'default'"
+        items = list(self._container("retention_policies").query_items(
+            query=query, partition_key="default"
+        ))
+        return items[0] if items else None
+
+    async def upsert_retention_policy(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create or update the retention policy."""
+        data["id"] = "default"
+        data["updated_at"] = datetime.utcnow().isoformat()
+        self._container("retention_policies").upsert_item(body=data)
+        logger.info("Updated retention policy")
+        return data
+
+    # --- Audit log operations ---
+
+    async def create_audit_log(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Record an audit log entry."""
+        doc = {
+            "id": str(uuid.uuid4()),
+            **entry,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._container("audit_logs").create_item(body=doc)
+        logger.info("Created audit log: %s", doc.get("action", "unknown"))
+        return doc
+
+    # --- Soft delete & purge operations ---
+
+    async def soft_delete_expired_items(
+        self, container_name: str, retention_days: int
+    ) -> list[dict[str, Any]]:
+        """Mark items older than retention_days as soft-deleted. Returns affected items."""
+        if retention_days <= 0:
+            return []
+        cutoff = (datetime.utcnow() - timedelta(days=retention_days)).isoformat()
+        query = (
+            "SELECT * FROM c WHERE c.created_at < @cutoff "
+            "AND (NOT IS_DEFINED(c.deleted_at) OR c.deleted_at = null)"
+        )
+        params = [{"name": "@cutoff", "value": cutoff}]
+        items = list(self._container(container_name).query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        now = datetime.utcnow().isoformat()
+        for item in items:
+            item["deleted_at"] = now
+            self._container(container_name).upsert_item(body=item)
+        logger.info(
+            "Soft-deleted %d items from '%s' (older than %d days)",
+            len(items), container_name, retention_days,
+        )
+        return items
+
+    async def purge_soft_deleted_items(
+        self, container_name: str, grace_period_days: int
+    ) -> int:
+        """Permanently delete items that were soft-deleted beyond the grace period."""
+        cutoff = (datetime.utcnow() - timedelta(days=grace_period_days)).isoformat()
+        query = (
+            "SELECT * FROM c WHERE IS_DEFINED(c.deleted_at) "
+            "AND c.deleted_at != null AND c.deleted_at < @cutoff"
+        )
+        params = [{"name": "@cutoff", "value": cutoff}]
+        items = list(self._container(container_name).query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        # Determine partition key based on container configuration
+        uses_doctor_id_pk = container_name in ("notes", "reports", "style_profiles")
+        count = 0
+        for item in items:
+            pk = item.get("doctor_id", item["id"]) if uses_doctor_id_pk else item["id"]
+            try:
+                self._container(container_name).delete_item(
+                    item=item["id"], partition_key=pk
+                )
+                count += 1
+            except CosmosResourceNotFoundError:
+                pass
+        logger.info(
+            "Purged %d items from '%s' (grace period %d days)",
+            count, container_name, grace_period_days,
+        )
+        return count
 
 
 # Singleton instance
