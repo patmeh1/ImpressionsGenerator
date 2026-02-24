@@ -37,7 +37,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true // RBAC access model (no access policies)
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    enablePurgeProtection: isProduction ? true : null
+    enablePurgeProtection: true // HIPAA: purge protection required for all environments
     enabledForDeployment: false
     enabledForDiskEncryption: false
     enabledForTemplateDeployment: false

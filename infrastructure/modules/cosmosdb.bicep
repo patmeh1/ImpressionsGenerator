@@ -43,7 +43,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
       }
     ]
     // HIPAA: disable key-based metadata write access
-    disableKeyBasedMetadataWriteAccess: false
+    disableKeyBasedMetadataWriteAccess: true
     enableAutomaticFailover: isProduction
     enableMultipleWriteLocations: false
     publicNetworkAccess: 'Enabled'

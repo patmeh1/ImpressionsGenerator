@@ -1,5 +1,6 @@
 // ============================================================================
 // Azure AI Search Module — Search service for indexing medical notes
+// HIPAA: encryption at rest enabled by default (Azure-managed keys)
 // basic SKU for dev/staging, standard for prod
 // ============================================================================
 
