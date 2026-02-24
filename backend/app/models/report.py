@@ -27,6 +27,7 @@ class ReportVersion(BaseModel):
     recommendations: str
     status: ReportStatus
     edited_at: datetime
+    edited_by: str = ""
 
 
 class ReportResponse(BaseModel):
