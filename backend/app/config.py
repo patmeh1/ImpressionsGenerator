@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # Azure Key Vault
     KEYVAULT_URL: str = ""
 
-    # Azure Application Insights (audit trail)
+    # Azure Monitor / Application Insights (audit trail)
     APPINSIGHTS_CONNECTION_STRING: str = ""
 
     # CORS
