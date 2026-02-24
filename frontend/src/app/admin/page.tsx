@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getDoctors, getAdminStats } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Doctor, UsageStatsData } from '@/lib/types';
 import UsageStats from '@/components/UsageStats';
 import {
@@ -42,6 +43,7 @@ export default function AdminPage() {
   );
 
   return (
+    <ProtectedRoute requiredRole="Admin">
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <ShieldCheck size={24} className="text-primary-500" />
@@ -153,5 +155,6 @@ export default function AdminPage() {
         </div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
