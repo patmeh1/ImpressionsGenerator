@@ -11,7 +11,10 @@ python-docx
 PyPDF2
 pydantic
 pydantic-settings
+azure-monitor-opentelemetry
+opentelemetry-api
 httpx
+opencensus-ext-azure
 pytest
 pytest-asyncio
 pytest-cov

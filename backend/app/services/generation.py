@@ -7,10 +7,15 @@ from app.models.style_profile import StyleProfile
 from app.services.ai_search import ai_search_service
 from app.services.cosmos_db import cosmos_service
 from app.services.grounding import validate_grounding
+from app.services.monitoring import monitoring_service
 from app.services.openai_service import openai_service
 from app.services.style_extraction import style_extraction_service
 
 logger = logging.getLogger(__name__)
+
+
+class DoctorNotFoundError(Exception):
+    """Raised when the specified doctor does not exist."""
 
 
 class GenerationService:
@@ -32,52 +37,63 @@ class GenerationService:
         body_region: str = "",
     ) -> dict[str, Any]:
         """Execute the full generation pipeline."""
+        start_ms = monitoring_service.current_time_ms()
         logger.info(
             "Starting generation for doctor %s (type=%s, region=%s)",
             doctor_id, report_type, body_region,
         )
 
+        # 0. Verify the doctor exists
+        doctor = await cosmos_service.get_doctor(doctor_id)
+        if doctor is None:
+            raise DoctorNotFoundError(f"Doctor '{doctor_id}' not found")
+
         # 1. Retrieve or extract the style profile
-        style_profile = await self._get_or_build_style_profile(doctor_id)
-        style_instructions = style_extraction_service.build_style_instructions(style_profile)
+        with monitoring_service.start_span("style_retrieval", {"doctor_id": doctor_id}):
+            style_profile = await self._get_or_build_style_profile(doctor_id)
+            style_instructions = style_extraction_service.build_style_instructions(style_profile)
 
         # 2. Search for similar notes as few-shot examples
-        few_shot_examples = await self._get_few_shot_examples(
-            doctor_id, dictated_text, report_type, body_region
-        )
+        with monitoring_service.start_span("few_shot_retrieval"):
+            few_shot_examples = await self._get_few_shot_examples(
+                doctor_id, dictated_text, report_type, body_region
+            )
 
         # 3. Build grounding rules from input
         grounding_rules = self._build_grounding_rules(dictated_text)
 
         # 4. Call Azure OpenAI
-        generated = await openai_service.generate_report(
-            dictated_text=dictated_text,
-            style_instructions=style_instructions,
-            grounding_rules=grounding_rules,
-            few_shot_examples=few_shot_examples,
-            report_type=report_type,
-            body_region=body_region,
-        )
+        with monitoring_service.start_span("openai_call"):
+            generated = await openai_service.generate_report(
+                dictated_text=dictated_text,
+                style_instructions=style_instructions,
+                grounding_rules=grounding_rules,
+                few_shot_examples=few_shot_examples,
+                report_type=report_type,
+                body_region=body_region,
+            )
 
         # 5. Validate grounding
-        output_text = " ".join([
-            generated.get("findings", ""),
-            generated.get("impressions", ""),
-            generated.get("recommendations", ""),
-        ])
-        grounding_result = validate_grounding(dictated_text, output_text)
+        with monitoring_service.start_span("grounding_validation"):
+            output_text = " ".join([
+                generated.get("findings", ""),
+                generated.get("impressions", ""),
+                generated.get("recommendations", ""),
+            ])
+            grounding_result = validate_grounding(dictated_text, output_text)
 
         # 6. Persist the report
-        report_data = {
-            "doctor_id": doctor_id,
-            "input_text": dictated_text,
-            "report_type": report_type,
-            "body_region": body_region,
-            "findings": generated["findings"],
-            "impressions": generated["impressions"],
-            "recommendations": generated["recommendations"],
-        }
-        report = await cosmos_service.create_report(report_data)
+        with monitoring_service.start_span("persist_report"):
+            report_data = {
+                "doctor_id": doctor_id,
+                "input_text": dictated_text,
+                "report_type": report_type,
+                "body_region": body_region,
+                "findings": generated["findings"],
+                "impressions": generated["impressions"],
+                "recommendations": generated["recommendations"],
+            }
+            report = await cosmos_service.create_report(report_data)
 
         # Index the report for future RAG retrieval
         try:
@@ -86,11 +102,20 @@ class GenerationService:
             logger.warning("Failed to index report for search: %s", e)
 
         # Attach grounding info to response
-        report["grounding"] = grounding_result.to_dict()
+        report["grounding_validation"] = grounding_result.to_dict()
+
+        # Track generation metrics
+        duration_ms = monitoring_service.current_time_ms() - start_ms
+        token_usage = generated.get("token_usage")
+        monitoring_service.track_generation(
+            doctor_id=doctor_id,
+            duration_ms=duration_ms,
+            token_usage=token_usage,
+        )
 
         logger.info(
-            "Generation complete: report %s (grounded=%s)",
-            report["id"], grounding_result.is_grounded,
+            "Generation complete: report %s (grounded=%s, %.1fms)",
+            report["id"], grounding_result.is_grounded, duration_ms,
         )
         return report
 
@@ -126,6 +151,7 @@ class GenerationService:
                 report_type=report_type or None,
                 body_region=body_region or None,
                 top=3,
+                boost_high_rated=True,
             )
             logger.info("Retrieved %d few-shot examples", len(examples))
             return examples

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getReports, getAdminStats } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Report, UsageStatsData } from '@/lib/types';
 import {
   Sparkles,
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   }, []);
 
   return (
+    <ProtectedRoute>
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
 
@@ -148,7 +150,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2 ml-4 shrink-0">
                     <span
                       className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        report.status === 'approved'
+                        report.status === 'final'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                           : report.status === 'rejected'
                             ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -168,5 +170,6 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.auth.entra_id import extract_user_info, validate_token
+from app.auth.entra_id import extract_user_info
 from app.auth.dependencies import get_current_user, require_role
 
 

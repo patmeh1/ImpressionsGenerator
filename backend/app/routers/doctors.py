@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user, require_role
 from app.models.doctor import DoctorCreate, DoctorResponse, DoctorUpdate
+from app.models.style_profile import StyleProfile
+from app.services.audit import audit_service
 from app.services.cosmos_db import cosmos_service
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,7 @@ async def list_doctors(
     user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     """List all doctors. Admins see all; doctors see only themselves."""
+    audit_service.log_data_access(user, "doctor", "", "list")
     if "Admin" in user.get("roles", []):
         return await cosmos_service.list_doctors()
     else:
@@ -32,6 +35,7 @@ async def get_doctor(
 ) -> dict[str, Any]:
     """Get a doctor profile by ID."""
     _enforce_doctor_access(user, doctor_id)
+    audit_service.log_data_access(user, "doctor", doctor_id, "read")
     doctor = await cosmos_service.get_doctor(doctor_id)
     if not doctor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
@@ -45,7 +49,11 @@ async def create_doctor(
 ) -> dict[str, Any]:
     """Create a new doctor profile. Admin only."""
     data = body.model_dump()
-    return await cosmos_service.create_doctor(data)
+    result = await cosmos_service.create_doctor(data)
+    audit_service.log_admin_action(
+        user, "create", "doctor", result.get("id", ""), details="profile_created",
+    )
+    return result
 
 
 @router.put("/{doctor_id}", response_model=DoctorResponse)
@@ -60,7 +68,26 @@ async def update_doctor(
     updated = await cosmos_service.update_doctor(doctor_id, data)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    audit_service.log_admin_action(
+        user, "update", "doctor", doctor_id, details="profile_updated",
+    )
     return updated
+
+
+@router.get("/{doctor_id}/style-profile", response_model=StyleProfile)
+async def get_style_profile(
+    doctor_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Get the extracted writing style profile for a doctor."""
+    _enforce_doctor_access(user, doctor_id)
+    profile = await cosmos_service.get_style_profile(doctor_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Style profile not found for this doctor",
+        )
+    return profile
 
 
 @router.delete("/{doctor_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -72,6 +99,9 @@ async def delete_doctor(
     deleted = await cosmos_service.delete_doctor(doctor_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found")
+    audit_service.log_admin_action(
+        user, "delete", "doctor", doctor_id, details="profile_deleted",
+    )
 
 
 def _enforce_doctor_access(user: dict[str, Any], doctor_id: str) -> None:

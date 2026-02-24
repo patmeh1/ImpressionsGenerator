@@ -2,7 +2,7 @@
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from azure.cosmos import ContainerProxy, CosmosClient, PartitionKey
@@ -38,6 +38,9 @@ class CosmosDBService:
             ("notes", "/doctor_id"),
             ("reports", "/doctor_id"),
             ("style_profiles", "/doctor_id"),
+            ("feedback", "/report_id"),
+            ("retention_policies", "/id"),
+            ("audit_logs", "/id"),
         ]
         for name, pk_path in container_configs:
             self._containers[name] = self._database.create_container_if_not_exists(
@@ -55,10 +58,12 @@ class CosmosDBService:
     # --- Doctor operations ---
 
     async def create_doctor(self, data: dict[str, Any]) -> dict[str, Any]:
+        now = datetime.utcnow().isoformat()
         doc = {
             "id": str(uuid.uuid4()),
             **data,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": now,
+            "updated_at": now,
         }
         self._container("doctors").create_item(body=doc)
         logger.info("Created doctor %s", doc["id"])
@@ -85,6 +90,7 @@ class CosmosDBService:
         if existing is None:
             return None
         existing.update({k: v for k, v in data.items() if v is not None})
+        existing["updated_at"] = datetime.utcnow().isoformat()
         self._container("doctors").replace_item(item=doctor_id, body=existing)
         logger.info("Updated doctor %s", doctor_id)
         return existing
@@ -177,7 +183,8 @@ class CosmosDBService:
             ))
 
     async def update_report(
-        self, report_id: str, doctor_id: str, data: dict[str, Any]
+        self, report_id: str, doctor_id: str, data: dict[str, Any],
+        edited_by: str = "",
     ) -> dict[str, Any] | None:
         existing = await self.get_report(report_id, doctor_id)
         if existing is None:
@@ -191,6 +198,7 @@ class CosmosDBService:
             "recommendations": existing.get("recommendations", ""),
             "status": existing.get("status", "draft"),
             "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": edited_by,
         }
         existing.setdefault("versions", []).append(version)
         existing.update({k: v for k, v in data.items() if v is not None})
@@ -202,15 +210,51 @@ class CosmosDBService:
         return existing
 
     async def approve_report(
-        self, report_id: str, doctor_id: str
+        self, report_id: str, doctor_id: str, approved_by: str = "",
     ) -> dict[str, Any] | None:
         existing = await self.get_report(report_id, doctor_id)
         if existing is None:
             return None
+
+        # Save current state as a version before marking final
+        version = {
+            "version": len(existing.get("versions", [])) + 1,
+            "findings": existing.get("findings", ""),
+            "impressions": existing.get("impressions", ""),
+            "recommendations": existing.get("recommendations", ""),
+            "status": existing.get("status", "draft"),
+            "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": approved_by,
+        }
+        existing.setdefault("versions", []).append(version)
         existing["status"] = "final"
         existing["updated_at"] = datetime.utcnow().isoformat()
         self._container("reports").replace_item(item=report_id, body=existing)
         logger.info("Approved report %s", report_id)
+        return existing
+
+    async def reject_report(
+        self, report_id: str, doctor_id: str, rejected_by: str = "",
+    ) -> dict[str, Any] | None:
+        existing = await self.get_report(report_id, doctor_id)
+        if existing is None:
+            return None
+
+        # Save current state as a version before marking rejected
+        version = {
+            "version": len(existing.get("versions", [])) + 1,
+            "findings": existing.get("findings", ""),
+            "impressions": existing.get("impressions", ""),
+            "recommendations": existing.get("recommendations", ""),
+            "status": existing.get("status", "draft"),
+            "edited_at": datetime.utcnow().isoformat(),
+            "edited_by": rejected_by,
+        }
+        existing.setdefault("versions", []).append(version)
+        existing["status"] = "rejected"
+        existing["updated_at"] = datetime.utcnow().isoformat()
+        self._container("reports").replace_item(item=report_id, body=existing)
+        logger.info("Rejected report %s", report_id)
         return existing
 
     # --- Style Profile operations ---
@@ -230,6 +274,65 @@ class CosmosDBService:
         self._container("style_profiles").upsert_item(body=data)
         logger.info("Upserted style profile for doctor %s", data.get("doctor_id"))
         return data
+
+    # --- Feedback operations ---
+
+    async def create_feedback(
+        self, report_id: str, doctor_id: str, data: dict[str, Any]
+    ) -> dict[str, Any]:
+        doc = {
+            "id": str(uuid.uuid4()),
+            "report_id": report_id,
+            "doctor_id": doctor_id,
+            **data,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._container("feedback").create_item(body=doc)
+        logger.info("Created feedback %s for report %s", doc["id"], report_id)
+        return doc
+
+    async def get_feedback_for_report(self, report_id: str) -> list[dict[str, Any]]:
+        query = "SELECT * FROM c WHERE c.report_id = @report_id ORDER BY c.created_at DESC"
+        params = [{"name": "@report_id", "value": report_id}]
+        return list(self._container("feedback").query_items(
+            query=query, parameters=params, partition_key=report_id
+        ))
+
+    async def get_average_rating_for_doctor(self, doctor_id: str) -> dict[str, Any]:
+        query = (
+            "SELECT VALUE {"
+            "'avg_rating': AVG(c.rating), "
+            "'total_feedback': COUNT(1)"
+            "} FROM c WHERE c.doctor_id = @doctor_id"
+        )
+        params = [{"name": "@doctor_id", "value": doctor_id}]
+        results = list(self._container("feedback").query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        if results and results[0]:
+            return {
+                "doctor_id": doctor_id,
+                "avg_rating": results[0].get("avg_rating") or 0,
+                "total_feedback": results[0].get("total_feedback", 0),
+            }
+        return {"doctor_id": doctor_id, "avg_rating": 0, "total_feedback": 0}
+
+    async def get_high_rated_report_ids(
+        self, doctor_id: str, min_rating: int = 4
+    ) -> list[str]:
+        """Return report IDs that received high style ratings from a doctor."""
+        query = (
+            "SELECT c.report_id FROM c "
+            "WHERE c.doctor_id = @doctor_id AND c.rating >= @min_rating"
+        )
+        params = [
+            {"name": "@doctor_id", "value": doctor_id},
+            {"name": "@min_rating", "value": min_rating},
+        ]
+        items = list(self._container("feedback").query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        return [item["report_id"] for item in items]
 
     # --- Admin statistics ---
 
@@ -257,6 +360,95 @@ class CosmosDBService:
             doctor["note_count"] = len(notes)
             doctor["report_count"] = len(reports)
         return doctors
+
+    # --- Retention policy operations ---
+
+    async def get_retention_policy(self) -> dict[str, Any] | None:
+        """Get the current retention policy (singleton document)."""
+        query = "SELECT * FROM c WHERE c.id = 'default'"
+        items = list(self._container("retention_policies").query_items(
+            query=query, partition_key="default"
+        ))
+        return items[0] if items else None
+
+    async def upsert_retention_policy(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Create or update the retention policy."""
+        data["id"] = "default"
+        data["updated_at"] = datetime.utcnow().isoformat()
+        self._container("retention_policies").upsert_item(body=data)
+        logger.info("Updated retention policy")
+        return data
+
+    # --- Audit log operations ---
+
+    async def create_audit_log(self, entry: dict[str, Any]) -> dict[str, Any]:
+        """Record an audit log entry."""
+        doc = {
+            "id": str(uuid.uuid4()),
+            **entry,
+            "created_at": datetime.utcnow().isoformat(),
+        }
+        self._container("audit_logs").create_item(body=doc)
+        logger.info("Created audit log: %s", doc.get("action", "unknown"))
+        return doc
+
+    # --- Soft delete & purge operations ---
+
+    async def soft_delete_expired_items(
+        self, container_name: str, retention_days: int
+    ) -> list[dict[str, Any]]:
+        """Mark items older than retention_days as soft-deleted. Returns affected items."""
+        if retention_days <= 0:
+            return []
+        cutoff = (datetime.utcnow() - timedelta(days=retention_days)).isoformat()
+        query = (
+            "SELECT * FROM c WHERE c.created_at < @cutoff "
+            "AND (NOT IS_DEFINED(c.deleted_at) OR c.deleted_at = null)"
+        )
+        params = [{"name": "@cutoff", "value": cutoff}]
+        items = list(self._container(container_name).query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        now = datetime.utcnow().isoformat()
+        for item in items:
+            item["deleted_at"] = now
+            self._container(container_name).upsert_item(body=item)
+        logger.info(
+            "Soft-deleted %d items from '%s' (older than %d days)",
+            len(items), container_name, retention_days,
+        )
+        return items
+
+    async def purge_soft_deleted_items(
+        self, container_name: str, grace_period_days: int
+    ) -> int:
+        """Permanently delete items that were soft-deleted beyond the grace period."""
+        cutoff = (datetime.utcnow() - timedelta(days=grace_period_days)).isoformat()
+        query = (
+            "SELECT * FROM c WHERE IS_DEFINED(c.deleted_at) "
+            "AND c.deleted_at != null AND c.deleted_at < @cutoff"
+        )
+        params = [{"name": "@cutoff", "value": cutoff}]
+        items = list(self._container(container_name).query_items(
+            query=query, parameters=params, enable_cross_partition_query=True
+        ))
+        # Determine partition key based on container configuration
+        uses_doctor_id_pk = container_name in ("notes", "reports", "style_profiles")
+        count = 0
+        for item in items:
+            pk = item.get("doctor_id", item["id"]) if uses_doctor_id_pk else item["id"]
+            try:
+                self._container(container_name).delete_item(
+                    item=item["id"], partition_key=pk
+                )
+                count += 1
+            except CosmosResourceNotFoundError:
+                pass
+        logger.info(
+            "Purged %d items from '%s' (grace period %d days)",
+            count, container_name, grace_period_days,
+        )
+        return count
 
 
 # Singleton instance

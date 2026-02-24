@@ -9,6 +9,9 @@ import type {
   ReportVersion,
   UsageStatsData,
   PaginatedResponse,
+  Feedback,
+  FeedbackScores,
+  RetentionPolicy,
 } from '@/lib/types';
 
 const BASE_URL = '/api';
@@ -89,7 +92,7 @@ export async function uploadNote(
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes/upload`, {
+  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes`, {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
@@ -100,13 +103,19 @@ export async function uploadNote(
 
 export async function uploadNoteText(
   doctorId: string,
-  content: string,
-  filename: string
+  content: string
 ): Promise<Note> {
-  return request<Note>(`/doctors/${doctorId}/notes`, {
+  const token = await getAccessToken();
+  const formData = new FormData();
+  formData.append('content', content);
+
+  const res = await fetch(`${BASE_URL}/doctors/${doctorId}/notes`, {
     method: 'POST',
-    body: JSON.stringify({ content, filename }),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   });
+  if (!res.ok) throw new Error(`Failed to save note: ${res.status}`);
+  return res.json();
 }
 
 export async function deleteNote(
@@ -160,6 +169,18 @@ export async function updateReport(
   });
 }
 
+export async function approveReport(id: string): Promise<Report> {
+  return request<Report>(`/reports/${id}/approve`, {
+    method: 'POST',
+  });
+}
+
+export async function rejectReport(id: string): Promise<Report> {
+  return request<Report>(`/reports/${id}/reject`, {
+    method: 'POST',
+  });
+}
+
 export async function getReportVersions(
   reportId: string
 ): Promise<ReportVersion[]> {
@@ -182,4 +203,41 @@ export async function getDoctorStats(
   doctorId: string
 ): Promise<UsageStatsData> {
   return request<UsageStatsData>(`/admin/doctors/${doctorId}/stats`);
+}
+
+export async function getDoctorFeedbackScores(
+  doctorId: string
+): Promise<FeedbackScores> {
+  return request<FeedbackScores>(`/admin/doctors/${doctorId}/feedback-scores`);
+}
+
+// Feedback
+export async function submitFeedback(
+  reportId: string,
+  data: { rating: number; feedback_text?: string }
+): Promise<Feedback> {
+  return request<Feedback>(`/reports/${reportId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getReportFeedback(
+  reportId: string
+): Promise<Feedback[]> {
+  return request<Feedback[]>(`/reports/${reportId}/feedback`);
+}
+
+// Retention Policy
+export async function getRetentionPolicy(): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy');
+}
+
+export async function updateRetentionPolicy(
+  data: Partial<RetentionPolicy>
+): Promise<RetentionPolicy> {
+  return request<RetentionPolicy>('/admin/retention-policy', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
 }

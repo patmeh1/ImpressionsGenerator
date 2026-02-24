@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -14,23 +14,27 @@ from app.models.doctor import DoctorCreate, DoctorUpdate, DoctorResponse
 # ---------------------------------------------------------------------------
 @pytest.fixture()
 def sample_doctor_doc():
+    now = datetime.utcnow().isoformat()
     return {
         "id": "doctor-001",
         "name": "Dr. Jane Smith",
         "specialty": "Radiology",
         "department": "Diagnostic Imaging",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": now,
+        "updated_at": now,
     }
 
 
 @pytest.fixture()
 def sample_doctor_b_doc():
+    now = datetime.utcnow().isoformat()
     return {
         "id": "doctor-002",
         "name": "Dr. Bob Jones",
         "specialty": "Cardiology",
         "department": "Heart Center",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": now,
+        "updated_at": now,
     }
 
 
@@ -155,11 +159,14 @@ def test_doctor_update_partial():
 
 def test_doctor_response_model():
     """DoctorResponse round-trips from dict."""
+    now = datetime.utcnow()
     resp = DoctorResponse(
         id="d-1",
         name="Dr. Test",
         specialty="Radiology",
         department="Imaging",
-        created_at=datetime.utcnow(),
+        created_at=now,
+        updated_at=now,
     )
     assert resp.id == "d-1"
+    assert resp.updated_at == now

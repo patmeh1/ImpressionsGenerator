@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getReport, updateReport, getReportVersions } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
+import { getReport, updateReport, getReportVersions, approveReport, rejectReport } from '@/lib/api';
 import type { Report, ReportVersion } from '@/lib/types';
 import ReportViewer from '@/components/ReportViewer';
 import ReportEditor from '@/components/ReportEditor';
 import { CheckCircle, XCircle, Edit3, History, Loader2 } from 'lucide-react';
+import StyleFeedback from '@/components/StyleFeedback';
 
 export default function ReviewPage() {
   const params = useParams();
@@ -37,12 +39,16 @@ export default function ReviewPage() {
     load();
   }, [reportId]);
 
-  const handleStatusChange = async (status: 'approved' | 'rejected') => {
+  const handleStatusChange = async (status: 'final' | 'rejected') => {
     if (!report) return;
     setSaving(true);
     try {
-      const updated = await updateReport(report.id, { status });
+      const updated = status === 'final'
+        ? await approveReport(report.id)
+        : await rejectReport(report.id);
       setReport(updated);
+      const v = await getReportVersions(reportId).catch(() => []);
+      setVersions(v);
     } catch (err) {
       console.error(err);
     } finally {
@@ -50,7 +56,20 @@ export default function ReviewPage() {
     }
   };
 
-  const handleSave = async (data: { findings: string; impressions: string; recommendations: string }) => {
+  const handleReject = async () => {
+    if (!report) return;
+    setSaving(true);
+    try {
+      await rejectReport(report.id);
+      router.push('/generate');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = useCallback(async (data: { findings: string; impressions: string; recommendations: string }) => {
     if (!report) return;
     setSaving(true);
     try {
@@ -64,23 +83,28 @@ export default function ReviewPage() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [report, reportId]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <ProtectedRoute>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-primary-500" />
+        </div>
+      </ProtectedRoute>
     );
   }
 
   if (!report) {
     return (
-      <div className="text-center py-20 text-slate-500">Report not found.</div>
+      <ProtectedRoute>
+        <div className="text-center py-20 text-slate-500">Report not found.</div>
+      </ProtectedRoute>
     );
   }
 
   return (
+    <ProtectedRoute>
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
@@ -96,14 +120,14 @@ export default function ReviewPage() {
             </button>
           )}
           <button
-            onClick={() => handleStatusChange('approved')}
-            disabled={saving || report.status === 'approved'}
+            onClick={() => handleStatusChange('final')}
+            disabled={saving || report.status === 'final'}
             className="btn-primary flex items-center gap-1.5 text-sm bg-green-600 hover:bg-green-700"
           >
             <CheckCircle size={14} /> Approve
           </button>
           <button
-            onClick={() => handleStatusChange('rejected')}
+            onClick={handleReject}
             disabled={saving || report.status === 'rejected'}
             className="btn-danger flex items-center gap-1.5 text-sm"
           >
@@ -128,9 +152,13 @@ export default function ReviewPage() {
           )}
         </div>
 
-        {/* Version History Sidebar */}
+        {/* Sidebar */}
         <div className="xl:col-span-1">
-          <div className="card p-4">
+          {/* Style Feedback */}
+          <StyleFeedback reportId={reportId} />
+
+          {/* Version History */}
+          <div className="card p-4 mt-4">
             <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
               <History size={16} /> Version History
             </h3>
@@ -138,17 +166,17 @@ export default function ReviewPage() {
               <p className="text-xs text-slate-500">No previous versions</p>
             ) : (
               <ul className="space-y-2">
-                {versions.map((v) => (
+                {versions.map((v, idx) => (
                   <li
-                    key={v.id}
+                    key={idx}
                     className="text-xs bg-slate-50 dark:bg-slate-900 rounded-lg p-2.5"
                   >
                     <div className="flex justify-between mb-1">
                       <span className="font-medium text-slate-700 dark:text-slate-300">
-                        v{v.version_number}
+                        v{v.version}
                       </span>
                       <span className="text-slate-400">
-                        {new Date(v.created_at).toLocaleDateString()}
+                        {new Date(v.edited_at).toLocaleDateString()}
                       </span>
                     </div>
                     <p className="text-slate-500 truncate">{v.edited_by}</p>
@@ -160,5 +188,6 @@ export default function ReviewPage() {
         </div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

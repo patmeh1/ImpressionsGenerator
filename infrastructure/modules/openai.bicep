@@ -1,6 +1,8 @@
 // ============================================================================
 // Azure OpenAI Module — Cognitive Services account + GPT-4o deployment
 // Used for generating medical impressions from clinical notes
+// HIPAA: Azure OpenAI API does not use customer data for model training.
+// Data is processed within the tenant boundary. BAA-eligible service.
 // ============================================================================
 
 @description('Azure region for all resources')

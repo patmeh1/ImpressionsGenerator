@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user
 from app.models.report import GenerateRequest
-from app.services.generation import generation_service
+from app.services.audit import audit_service
+from app.services.generation import DoctorNotFoundError, generation_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/generate", tags=["generate"])
@@ -32,6 +33,7 @@ async def generate_report(
             detail="You can only generate reports for yourself",
         )
 
+    start = audit_service.start_timer()
     try:
         report = await generation_service.generate(
             dictated_text=body.dictated_text,
@@ -39,10 +41,15 @@ async def generate_report(
             report_type=body.report_type,
             body_region=body.body_region,
         )
+    except DoctorNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
     except RuntimeError as e:
         logger.error("Report generation failed: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Report generation failed: {e}",
         ) from e
     except Exception as e:
@@ -51,5 +58,19 @@ async def generate_report(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred during report generation",
         ) from e
+
+    output_text = "\n".join(filter(None, [
+        report.get("findings", ""),
+        report.get("impressions", ""),
+        report.get("recommendations", ""),
+    ]))
+    audit_service.log_generation(
+        user=user,
+        doctor_id=body.doctor_id,
+        input_text=body.dictated_text,
+        output_text=output_text,
+        duration_ms=audit_service.elapsed_ms(start),
+        report_id=report.get("id", ""),
+    )
 
     return report

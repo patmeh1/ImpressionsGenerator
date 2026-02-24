@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getReports } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Report } from '@/lib/types';
 import {
   Search,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 
 const REPORT_TYPES = ['All', 'CT', 'MRI', 'X-ray', 'PET', 'Ultrasound'];
-const STATUSES = ['All', 'draft', 'approved', 'rejected'];
+const STATUSES = ['All', 'draft', 'edited', 'final', 'rejected'];
 
 export default function HistoryPage() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -49,6 +50,7 @@ export default function HistoryPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <ProtectedRoute>
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <HistoryIcon size={24} className="text-primary-500" />
@@ -155,7 +157,7 @@ export default function HistoryPage() {
                     <td className="px-4 py-3">
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          r.status === 'approved'
+                          r.status === 'final'
                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                             : r.status === 'rejected'
                               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
@@ -201,5 +203,6 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

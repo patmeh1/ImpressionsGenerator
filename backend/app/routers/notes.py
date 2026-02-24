@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 
 from app.auth.dependencies import get_current_user
 from app.models.note import NoteResponse, SourceType
+from app.services.audit import audit_service
 from app.services.blob_storage import blob_service
 from app.services.cosmos_db import cosmos_service
 from app.services.ai_search import ai_search_service
 from app.services.style_extraction import style_extraction_service
-from app.utils.file_parser import FileParserError, extract_text
+from app.utils.file_parser import FileParserError, FileTooLargeError, extract_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/doctors/{doctor_id}/notes", tags=["notes"])
@@ -37,6 +38,10 @@ async def create_note(
         file_content = await file.read()
         try:
             text = extract_text(file.filename, file_content)
+        except FileTooLargeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e)
+            ) from e
         except FileParserError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
@@ -70,6 +75,8 @@ async def create_note(
 
     note = await cosmos_service.create_note(doctor_id, note_data)
 
+    audit_service.log_data_access(user, "note", note["id"], "create")
+
     # Index note in AI Search for RAG retrieval
     try:
         await ai_search_service.index_note({
@@ -102,6 +109,7 @@ async def list_notes(
 ) -> list[dict[str, Any]]:
     """List all notes for a doctor."""
     _enforce_note_access(user, doctor_id)
+    audit_service.log_data_access(user, "note", doctor_id, "list")
     return await cosmos_service.list_notes(doctor_id)
 
 
@@ -132,6 +140,13 @@ async def delete_note(
         logger.warning("Failed to delete note %s from search index: %s", note_id, e)
 
     await cosmos_service.delete_note(doctor_id, note_id)
+    audit_service.log_admin_action(user, "delete", "note", note_id)
+
+    # Re-extract style profile after note removal (best-effort)
+    try:
+        await style_extraction_service.extract_style(doctor_id)
+    except Exception as e:
+        logger.warning("Style re-extraction failed after note deletion: %s", e)
 
 
 def _enforce_note_access(user: dict[str, Any], doctor_id: str) -> None:

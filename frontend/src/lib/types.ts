@@ -1,20 +1,18 @@
 export interface Doctor {
   id: string;
   name: string;
-  email: string;
   specialty: string;
-  is_admin: boolean;
+  department: string;
   created_at: string;
-  updated_at: string;
+  updated_at: string | null;
 }
 
 export interface Note {
   id: string;
   doctor_id: string;
-  filename: string;
   content: string;
-  file_type: string;
-  file_size: number;
+  source_type: 'upload' | 'paste';
+  file_name: string | null;
   created_at: string;
 }
 
@@ -27,7 +25,8 @@ export interface Report {
   findings: string;
   impressions: string;
   recommendations: string;
-  status: 'draft' | 'approved' | 'rejected';
+  status: 'draft' | 'edited' | 'final' | 'approved' | 'rejected';
+  versions: ReportVersion[];
   created_at: string;
   updated_at: string;
 }
@@ -58,14 +57,13 @@ export interface GenerateResponse {
 }
 
 export interface ReportVersion {
-  id: string;
-  report_id: string;
-  version_number: number;
+  version: number;
   findings: string;
   impressions: string;
   recommendations: string;
+  status: 'draft' | 'edited' | 'final' | 'rejected';
+  edited_at: string;
   edited_by: string;
-  created_at: string;
 }
 
 export interface UsageStatsData {
@@ -80,4 +78,29 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   page_size: number;
+}
+
+export interface Feedback {
+  id: string;
+  report_id: string;
+  doctor_id: string;
+  rating: number;
+  feedback_text: string;
+  created_at: string;
+}
+
+export interface FeedbackScores {
+  doctor_id: string;
+  avg_rating: number;
+  total_feedback: number;
+}
+
+export interface RetentionPolicy {
+  id: string;
+  reports_retention_days: number;
+  notes_retention_days: number;
+  audit_logs_retention_days: number;
+  soft_delete_grace_period_days: number;
+  updated_at: string;
+  updated_by?: string;
 }

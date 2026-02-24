@@ -48,6 +48,7 @@ GROUNDING RULES:
 {grounding_rules}
 
 IMPORTANT:
+- You MUST NOT invent any clinical measurements, numbers, or findings.
 - Only include clinical information explicitly stated or directly implied by the dictation.
 - Do NOT fabricate measurements, dates, values, or findings.
 - Every number, measurement, and percentage in the output MUST originate from the input.
@@ -128,6 +129,15 @@ Respond ONLY with valid JSON."""
         if not content:
             raise RuntimeError("Empty response from Azure OpenAI")
 
+        # Extract token usage when available
+        token_usage: dict[str, int] | None = None
+        if response.usage:
+            token_usage = {
+                "prompt_tokens": response.usage.prompt_tokens or 0,
+                "completion_tokens": response.usage.completion_tokens or 0,
+                "total_tokens": response.usage.total_tokens or 0,
+            }
+
         try:
             result = json.loads(content)
         except json.JSONDecodeError as e:
@@ -138,6 +148,7 @@ Respond ONLY with valid JSON."""
             "findings": result.get("findings", ""),
             "impressions": result.get("impressions", ""),
             "recommendations": result.get("recommendations", ""),
+            "token_usage": token_usage,
         }
 
     async def analyze_style(self, notes_text: str) -> dict[str, Any]:

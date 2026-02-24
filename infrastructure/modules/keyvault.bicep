@@ -13,20 +13,14 @@ param environmentName string
 @description('Project name used for resource naming')
 param projectName string
 
-@description('Principal ID of the Container App managed identity for secret access')
-param containerAppPrincipalId string
+@description('Principal ID of the app managed identity for secret access')
+param appIdentityPrincipalId string
 
 @description('Cosmos DB endpoint to store as secret')
 param cosmosEndpoint string = ''
 
 @description('Storage account name to store as secret')
 param storageAccountName string = ''
-
-@description('OpenAI endpoint to store as secret')
-param openaiEndpoint string = ''
-
-@description('AI Search endpoint to store as secret')
-param searchEndpoint string = ''
 
 var isProduction = environmentName == 'prod'
 
@@ -43,7 +37,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: true // RBAC access model (no access policies)
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
-    enablePurgeProtection: isProduction ? true : null
+    enablePurgeProtection: true // HIPAA: purge protection required for all environments
     enabledForDeployment: false
     enabledForDiskEncryption: false
     enabledForTemplateDeployment: false
@@ -51,14 +45,14 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-// --- RBAC: Grant Container App identity "Key Vault Secrets User" role ---
+// --- RBAC: Grant app identity "Key Vault Secrets User" role ---
 // Role definition ID for Key Vault Secrets User: 4633458b-17de-408a-b874-0445c86b69e6
-resource secretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(containerAppPrincipalId)) {
-  name: guid(keyVault.id, containerAppPrincipalId, '4633458b-17de-408a-b874-0445c86b69e6')
+resource secretsUserRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(appIdentityPrincipalId)) {
+  name: guid(keyVault.id, appIdentityPrincipalId, '4633458b-17de-408a-b874-0445c86b69e6')
   scope: keyVault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
-    principalId: containerAppPrincipalId
+    principalId: appIdentityPrincipalId
     principalType: 'ServicePrincipal'
   }
 }
@@ -77,22 +71,6 @@ resource storageAccountNameSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01'
   name: 'storage-account-name'
   properties: {
     value: storageAccountName
-  }
-}
-
-resource openaiEndpointSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(openaiEndpoint)) {
-  parent: keyVault
-  name: 'openai-endpoint'
-  properties: {
-    value: openaiEndpoint
-  }
-}
-
-resource searchEndpointSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (!empty(searchEndpoint)) {
-  parent: keyVault
-  name: 'search-endpoint'
-  properties: {
-    value: searchEndpoint
   }
 }
 

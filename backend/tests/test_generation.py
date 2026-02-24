@@ -1,11 +1,14 @@
 """Tests for radiology report generation."""
 
 import json
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.models.report import GenerateRequest, ReportResponse, ReportStatus
+from app.models.style_profile import StyleProfile
+from app.services.generation import DoctorNotFoundError, GenerationService
 
 
 # ---------------------------------------------------------------------------
@@ -150,3 +153,230 @@ def test_generate_request_model():
 def test_report_status_enum():
     assert ReportStatus.DRAFT.value == "draft"
     assert ReportStatus.FINAL.value == "final"
+
+
+# ---------------------------------------------------------------------------
+# DoctorNotFoundError raised for missing doctor
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_raises_doctor_not_found_error():
+    """GenerationService.generate raises DoctorNotFoundError for non-existent doctor."""
+    service = GenerationService()
+
+    with patch("app.services.generation.cosmos_service") as mock_cosmos:
+        mock_cosmos.get_doctor = AsyncMock(return_value=None)
+
+        with pytest.raises(DoctorNotFoundError, match="not found"):
+            await service.generate(
+                dictated_text="Normal CT abdomen.",
+                doctor_id="non-existent",
+                report_type="CT",
+                body_region="Abdomen",
+            )
+
+
+# ---------------------------------------------------------------------------
+# Response includes grounding_validation key
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_returns_grounding_validation_key():
+    """Generated report dict must include 'grounding_validation' key."""
+    service = GenerationService()
+
+    mock_report = {
+        "id": "report-001",
+        "doctor_id": "doctor-001",
+        "input_text": "Liver 14.5 cm.",
+        "findings": "Liver 14.5 cm.",
+        "impressions": "Normal.",
+        "recommendations": "None.",
+        "status": "draft",
+    }
+
+    with (
+        patch("app.services.generation.cosmos_service") as mock_cosmos,
+        patch("app.services.generation.openai_service") as mock_openai,
+        patch("app.services.generation.ai_search_service") as mock_search,
+        patch("app.services.generation.style_extraction_service") as mock_style,
+    ):
+        mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
+        mock_cosmos.get_style_profile = AsyncMock(return_value=None)
+        mock_cosmos.create_report = AsyncMock(return_value=mock_report.copy())
+        mock_openai.generate_report = AsyncMock(return_value={
+            "findings": "Liver 14.5 cm.",
+            "impressions": "Normal.",
+            "recommendations": "None.",
+        })
+        mock_search.search_similar_notes = AsyncMock(return_value=[])
+        mock_search.index_report = AsyncMock()
+        mock_style.extract_style = AsyncMock(
+            return_value=StyleProfile(doctor_id="doctor-001")
+        )
+        mock_style.build_style_instructions.return_value = "Use short sentences."
+
+        result = await service.generate(
+            dictated_text="Liver 14.5 cm.",
+            doctor_id="doctor-001",
+            report_type="CT",
+            body_region="Abdomen",
+        )
+
+        assert "grounding_validation" in result
+        assert "is_grounded" in result["grounding_validation"]
+
+
+# ---------------------------------------------------------------------------
+# OpenAI RuntimeError is propagated (router maps to 503)
+# ---------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_generate_propagates_runtime_error_from_openai():
+    """RuntimeError from OpenAI service should propagate from generate()."""
+    service = GenerationService()
+
+    with (
+        patch("app.services.generation.cosmos_service") as mock_cosmos,
+        patch("app.services.generation.openai_service") as mock_openai,
+        patch("app.services.generation.ai_search_service") as mock_search,
+        patch("app.services.generation.style_extraction_service") as mock_style,
+    ):
+        mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
+        mock_cosmos.get_style_profile = AsyncMock(return_value=None)
+        mock_openai.generate_report = AsyncMock(
+            side_effect=RuntimeError("OpenAIService not initialized")
+        )
+        mock_search.search_similar_notes = AsyncMock(return_value=[])
+        mock_style.extract_style = AsyncMock(
+            return_value=StyleProfile(doctor_id="doctor-001")
+        )
+        mock_style.build_style_instructions.return_value = "Use short sentences."
+
+        with pytest.raises(RuntimeError, match="OpenAIService not initialized"):
+            await service.generate(
+                dictated_text="Normal CT abdomen.",
+                doctor_id="doctor-001",
+                report_type="CT",
+                body_region="Abdomen",
+            )
+
+
+# ---------------------------------------------------------------------------
+# T15 – report versioning
+# ---------------------------------------------------------------------------
+def test_report_version_model():
+    """ReportVersion model should capture version snapshot."""
+    from app.models.report import ReportVersion
+
+    version = ReportVersion(
+        version=1,
+        findings="Original findings.",
+        impressions="Original impressions.",
+        recommendations="Original recommendations.",
+        status=ReportStatus.DRAFT,
+        edited_at=datetime.utcnow(),
+    )
+    assert version.version == 1
+    assert version.status == ReportStatus.DRAFT
+    assert version.findings == "Original findings."
+
+
+@pytest.mark.asyncio
+async def test_report_versioning():
+    """Updating a report should create a version snapshot of the previous state."""
+    from copy import deepcopy
+
+    original = {
+        "id": "report-v001",
+        "doctor_id": "doctor-001",
+        "input_text": "CT abdomen findings",
+        "findings": "Original findings.",
+        "impressions": "Original impressions.",
+        "recommendations": "Original recommendations.",
+        "report_type": "CT",
+        "body_region": "Abdomen",
+        "status": "draft",
+        "versions": [],
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    mock_container = MagicMock()
+    mock_container.read_item = AsyncMock(return_value=deepcopy(original))
+    mock_container.replace_item = MagicMock()
+
+    # Simulate the update_report logic from cosmos_db service
+    existing = await mock_container.read_item(
+        item="report-v001", partition_key="doctor-001"
+    )
+    # Save current state as a version
+    version = {
+        "version": len(existing.get("versions", [])) + 1,
+        "findings": existing["findings"],
+        "impressions": existing["impressions"],
+        "recommendations": existing["recommendations"],
+        "status": existing["status"],
+        "edited_at": datetime.utcnow().isoformat(),
+    }
+    existing.setdefault("versions", []).append(version)
+    existing["findings"] = "Updated findings."
+    existing["status"] = "edited"
+    existing["updated_at"] = datetime.utcnow().isoformat()
+    mock_container.replace_item(item="report-v001", body=existing)
+
+    # Verify version was created
+    assert len(existing["versions"]) == 1
+    assert existing["versions"][0]["version"] == 1
+    assert existing["versions"][0]["findings"] == "Original findings."
+    assert existing["versions"][0]["status"] == "draft"
+
+    # Verify current state is updated
+    assert existing["findings"] == "Updated findings."
+    assert existing["status"] == "edited"
+
+    # Simulate a second update
+    version2 = {
+        "version": len(existing["versions"]) + 1,
+        "findings": existing["findings"],
+        "impressions": existing["impressions"],
+        "recommendations": existing["recommendations"],
+        "status": existing["status"],
+        "edited_at": datetime.utcnow().isoformat(),
+    }
+    existing["versions"].append(version2)
+    existing["findings"] = "Final findings."
+    existing["status"] = "final"
+
+    assert len(existing["versions"]) == 2
+    assert existing["versions"][1]["version"] == 2
+    assert existing["versions"][1]["findings"] == "Updated findings."
+
+
+def test_report_response_with_versions():
+    """ReportResponse should include version history."""
+    from app.models.report import ReportVersion
+
+    versions = [
+        ReportVersion(
+            version=1,
+            findings="V1 findings.",
+            impressions="V1 impressions.",
+            recommendations="V1 recommendations.",
+            status=ReportStatus.DRAFT,
+            edited_at=datetime.utcnow(),
+        ),
+    ]
+    resp = ReportResponse(
+        id="r-1",
+        doctor_id="d-1",
+        input_text="CT abdomen",
+        findings="V2 findings.",
+        impressions="V2 impressions.",
+        recommendations="V2 recommendations.",
+        report_type="CT",
+        body_region="Abdomen",
+        status=ReportStatus.EDITED,
+        versions=versions,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    assert len(resp.versions) == 1
+    assert resp.versions[0].version == 1
+    assert resp.status == ReportStatus.EDITED

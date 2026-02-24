@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { Report } from '@/lib/types';
 import { Save, XCircle } from 'lucide-react';
 
@@ -15,9 +15,21 @@ export default function ReportEditor({ report, onSave, onCancel }: ReportEditorP
   const [impressions, setImpressions] = useState(report.impressions);
   const [recommendations, setRecommendations] = useState(report.recommendations);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     onSave({ findings, impressions, recommendations });
-  };
+  }, [onSave, findings, impressions, recommendations]);
+
+  // Ctrl+S keyboard shortcut to save draft
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave]);
 
   return (
     <div className="space-y-5">
@@ -58,9 +70,9 @@ export default function ReportEditor({ report, onSave, onCancel }: ReportEditorP
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={handleSave} className="btn-primary flex items-center gap-2">
+        <button onClick={handleSave} data-testid="save-draft-btn" className="btn-primary flex items-center gap-2">
           <Save size={16} />
-          Save Changes
+          Save Draft
         </button>
         <button onClick={onCancel} className="btn-secondary flex items-center gap-2">
           <XCircle size={16} />

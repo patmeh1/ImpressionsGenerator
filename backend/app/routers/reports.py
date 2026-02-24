@@ -6,7 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import get_current_user
+from app.models.feedback import FeedbackCreate, FeedbackResponse
 from app.models.report import ReportResponse, ReportUpdate
+from app.services.ai_search import ai_search_service
+from app.services.audit import audit_service
 from app.services.cosmos_db import cosmos_service
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,7 @@ async def list_reports(
     user: dict[str, Any] = Depends(get_current_user),
 ) -> list[dict[str, Any]]:
     """List reports. Admins see all; doctors see only their own."""
+    audit_service.log_data_access(user, "report", "", "list")
     if "Admin" in user.get("roles", []):
         return await cosmos_service.list_reports(doctor_id=doctor_id)
     else:
@@ -32,6 +36,7 @@ async def get_report(
 ) -> dict[str, Any]:
     """Get a specific report."""
     report = await _find_report(report_id, user)
+    audit_service.log_data_access(user, "report", report_id, "read")
     return report
 
 
@@ -48,9 +53,13 @@ async def update_report(
         report_id=report_id,
         doctor_id=report["doctor_id"],
         data=data,
+        edited_by=user.get("user_id", ""),
     )
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    audit_service.log_admin_action(
+        user, "update", "report", report_id, details="report_edited",
+    )
     return updated
 
 
@@ -64,10 +73,31 @@ async def approve_report(
     approved = await cosmos_service.approve_report(
         report_id=report_id,
         doctor_id=report["doctor_id"],
+        approved_by=user.get("user_id", ""),
     )
     if not approved:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    audit_service.log_admin_action(
+        user, "approve", "report", report_id, details="report_approved",
+    )
     return approved
+
+
+@router.post("/{report_id}/reject", response_model=ReportResponse)
+async def reject_report(
+    report_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Mark a report as rejected."""
+    report = await _find_report(report_id, user)
+    rejected = await cosmos_service.reject_report(
+        report_id=report_id,
+        doctor_id=report["doctor_id"],
+        rejected_by=user.get("user_id", ""),
+    )
+    if not rejected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    return rejected
 
 
 @router.get("/{report_id}/versions")
@@ -77,7 +107,43 @@ async def get_report_versions(
 ) -> list[dict[str, Any]]:
     """Get version history for a report."""
     report = await _find_report(report_id, user)
+    audit_service.log_data_access(user, "report_versions", report_id, "read")
     return report.get("versions", [])
+
+
+@router.post("/{report_id}/feedback", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    report_id: str,
+    body: FeedbackCreate,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Submit a style accuracy rating for a generated report."""
+    report = await _find_report(report_id, user)
+    feedback = await cosmos_service.create_feedback(
+        report_id=report_id,
+        doctor_id=report["doctor_id"],
+        data=body.model_dump(),
+    )
+    # Best-effort: update the search index with the rating so future
+    # RAG retrieval can weight this report higher/lower.
+    try:
+        await ai_search_service.update_document_rating(
+            doc_id=report_id,
+            style_rating=float(body.rating),
+        )
+    except Exception as e:
+        logger.warning("Failed to update search index rating for report %s: %s", report_id, e)
+    return feedback
+
+
+@router.get("/{report_id}/feedback", response_model=list[FeedbackResponse])
+async def get_report_feedback(
+    report_id: str,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """Get all feedback for a report."""
+    await _find_report(report_id, user)
+    return await cosmos_service.get_feedback_for_report(report_id)
 
 
 async def _find_report(report_id: str, user: dict[str, Any]) -> dict[str, Any]:
