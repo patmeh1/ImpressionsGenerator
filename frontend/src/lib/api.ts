@@ -187,14 +187,6 @@ export async function getReportVersions(
   return request<ReportVersion[]>(`/reports/${reportId}/versions`);
 }
 
-export async function approveReport(id: string): Promise<Report> {
-  return request<Report>(`/reports/${id}/approve`, { method: 'POST' });
-}
-
-export async function rejectReport(id: string): Promise<Report> {
-  return request<Report>(`/reports/${id}/reject`, { method: 'POST' });
-}
-
 // Style Profile
 export async function getStyleProfile(
   doctorId: string

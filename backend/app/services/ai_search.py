@@ -307,3 +307,6 @@ class AzureAISearchService:
 
 # Singleton instance – importable as `ai_search_service` for backward compatibility
 ai_search_service = AzureAISearchService()
+
+# Alias for backward compatibility
+AISearchService = AzureAISearchService

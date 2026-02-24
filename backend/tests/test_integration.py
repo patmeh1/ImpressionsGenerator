@@ -289,9 +289,13 @@ class TestT24GenerationPipeline:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
             # Style profile exists
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_A)
+            mock_style.build_style_instructions.return_value = "Use unremarkable, within normal limits."
             # No few-shot examples
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             # OpenAI returns structured report
@@ -320,8 +324,8 @@ class TestT24GenerationPipeline:
             assert body["recommendations"]
 
             # Verify grounding validation is included
-            assert "grounding" in body
-            assert "is_grounded" in body["grounding"]
+            assert "grounding_validation" in body
+            assert "is_grounded" in body["grounding_validation"]
 
             # Verify style was retrieved
             mock_cosmos.get_style_profile.assert_called_once_with("doctor-001")
@@ -366,8 +370,12 @@ class TestT24GenerationPipeline:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_A)
+            mock_style.build_style_instructions.return_value = "Use unremarkable, within normal limits."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=grounded_output)
             mock_cosmos.create_report = AsyncMock(return_value=report_doc)
@@ -386,7 +394,7 @@ class TestT24GenerationPipeline:
             assert response.status_code == 200
             body = response.json()
             # All values (14.5, 3.2) come from the dictation → grounded
-            assert body["grounding"]["is_grounded"] is True
+            assert body["grounding_validation"]["is_grounded"] is True
 
     @pytest.mark.asyncio
     async def test_generation_detects_hallucinated_values(self, integration_client):
@@ -418,8 +426,12 @@ class TestT24GenerationPipeline:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_A)
+            mock_style.build_style_instructions.return_value = "Use unremarkable, within normal limits."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=hallucinated_output)
             mock_cosmos.create_report = AsyncMock(return_value=report_doc)
@@ -438,8 +450,8 @@ class TestT24GenerationPipeline:
             assert response.status_code == 200
             body = response.json()
             # 7.8 is not in the input → grounding should fail
-            assert body["grounding"]["is_grounded"] is False
-            assert len(body["grounding"]["hallucinated_values"]) > 0
+            assert body["grounding_validation"]["is_grounded"] is False
+            assert len(body["grounding_validation"]["hallucinated_values"]) > 0
 
 
 # ===================================================================
@@ -566,8 +578,12 @@ class TestT26MultiDoctorGeneration:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_A)
+            mock_style.build_style_instructions.return_value = "Use unremarkable, within normal limits."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=SAMPLE_GENERATED)
             mock_cosmos.create_report = AsyncMock(return_value=report_doc)
@@ -622,8 +638,12 @@ class TestT26MultiDoctorGeneration:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-002"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_B)
+            mock_style.build_style_instructions.return_value = "Use normal appearance, no significant change, negative."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=generated_b)
             mock_cosmos.create_report = AsyncMock(return_value=report_doc)
@@ -674,8 +694,12 @@ class TestT26MultiDoctorGeneration:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_A)
+            mock_style.build_style_instructions.return_value = "Use unremarkable, within normal limits."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=SAMPLE_GENERATED)
             mock_cosmos.create_report = AsyncMock(return_value=report_a)
@@ -719,8 +743,12 @@ class TestT26MultiDoctorGeneration:
             patch("app.services.generation.cosmos_service") as mock_cosmos,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.openai_service") as mock_openai,
+            patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-002"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=SAMPLE_STYLE_B)
+            mock_style.build_style_instructions.return_value = "Use normal appearance, no significant change, negative."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
             mock_openai.generate_report = AsyncMock(return_value=generated_b)
             mock_cosmos.create_report = AsyncMock(return_value=report_b)

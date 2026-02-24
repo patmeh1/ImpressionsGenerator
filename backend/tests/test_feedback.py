@@ -238,6 +238,7 @@ def test_boost_high_rated_reranking():
     ]
     mock_client.search = MagicMock(return_value=mock_results)
     service._search_client = mock_client
+    service._generate_embedding = MagicMock(return_value=[0.0] * 1536)
 
     import asyncio
     results = asyncio.get_event_loop().run_until_complete(

@@ -284,7 +284,9 @@ class TestGenerationService:
             patch("app.services.generation.openai_service") as mock_openai,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=None)
             mock_style.extract_style = AsyncMock(
                 return_value=StyleProfile(doctor_id="doctor-001")
@@ -315,7 +317,7 @@ class TestGenerationService:
                 body_region="Abdomen",
             )
             assert result["findings"] == "Liver is 14.5 cm."
-            assert "grounding" in result
+            assert "grounding_validation" in result
             mock_cosmos.create_report.assert_called_once()
 
     @pytest.mark.asyncio
@@ -340,7 +342,9 @@ class TestGenerationService:
             patch("app.services.generation.openai_service") as mock_openai,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "doctor-001"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=existing_profile)
             mock_style.build_style_instructions.return_value = "Use unremarkable."
             mock_search.search_similar_notes = AsyncMock(return_value=[])
@@ -378,7 +382,9 @@ class TestGenerationService:
             patch("app.services.generation.openai_service") as mock_openai,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "d-1"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=None)
             mock_style.extract_style = AsyncMock(
                 return_value=StyleProfile(doctor_id="d-1")
@@ -419,7 +425,9 @@ class TestGenerationService:
             patch("app.services.generation.openai_service") as mock_openai,
             patch("app.services.generation.ai_search_service") as mock_search,
             patch("app.services.generation.style_extraction_service") as mock_style,
+            patch("app.services.generation.monitoring_service"),
         ):
+            mock_cosmos.get_doctor = AsyncMock(return_value={"id": "d-1"})
             mock_cosmos.get_style_profile = AsyncMock(return_value=None)
             mock_style.extract_style = AsyncMock(side_effect=Exception("OpenAI down"))
             mock_style.build_style_instructions.return_value = ""
@@ -680,6 +688,7 @@ class TestAISearchService:
         svc = AISearchService()
         svc._search_client = MagicMock()
         svc._search_client.upload_documents = MagicMock()
+        svc._generate_embedding = MagicMock(return_value=[0.0] * 1536)
         await svc.index_note({"id": "n-1", "content": "CT findings"})
         svc._search_client.upload_documents.assert_called_once()
 
@@ -690,6 +699,7 @@ class TestAISearchService:
         svc = AISearchService()
         svc._search_client = MagicMock()
         svc._search_client.upload_documents = MagicMock()
+        svc._generate_embedding = MagicMock(return_value=[0.0] * 1536)
         report = {
             "id": "r-1",
             "doctor_id": "d-1",
@@ -720,8 +730,10 @@ class TestAISearchService:
                 "report_type": "CT",
                 "body_region": "Abdomen",
                 "@search.score": 0.95,
+                "style_rating": 0,
             }
         ]
+        svc._generate_embedding = MagicMock(return_value=[0.0] * 1536)
         result = await svc.search_similar_notes(
             doctor_id="d-1",
             query_text="CT abdomen",

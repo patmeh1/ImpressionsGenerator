@@ -338,7 +338,7 @@ async def test_generate_runtime_error(client):
                 "body_region": "Abdomen",
             },
         )
-        assert resp.status_code == 502
+        assert resp.status_code == 503
 
 
 @pytest.mark.asyncio
