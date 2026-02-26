@@ -13,6 +13,10 @@ from app.services.style_extraction import style_extraction_service
 logger = logging.getLogger(__name__)
 
 
+class DoctorNotFoundError(Exception):
+    """Raised when the specified doctor does not exist."""
+
+
 class GenerationService:
     """
     Orchestrates the full report generation pipeline:
@@ -36,6 +40,11 @@ class GenerationService:
             "Starting generation for doctor %s (type=%s, region=%s)",
             doctor_id, report_type, body_region,
         )
+
+        # 0. Verify the doctor exists
+        doctor = await cosmos_service.get_doctor(doctor_id)
+        if doctor is None:
+            raise DoctorNotFoundError(f"Doctor '{doctor_id}' not found")
 
         # 1. Retrieve or extract the style profile
         style_profile = await self._get_or_build_style_profile(doctor_id)
@@ -86,7 +95,7 @@ class GenerationService:
             logger.warning("Failed to index report for search: %s", e)
 
         # Attach grounding info to response
-        report["grounding"] = grounding_result.to_dict()
+        report["grounding_validation"] = grounding_result.to_dict()
 
         logger.info(
             "Generation complete: report %s (grounded=%s)",
