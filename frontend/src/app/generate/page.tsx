@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { getDoctors, generateReport } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Doctor, Report } from '@/lib/types';
 import DictationInput from '@/components/DictationInput';
 import DoctorSelector from '@/components/DoctorSelector';
@@ -68,6 +69,7 @@ export default function GeneratePage() {
   };
 
   return (
+    <ProtectedRoute>
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <Sparkles size={24} className="text-teal-500" />
@@ -162,5 +164,6 @@ export default function GeneratePage() {
         <ReportViewer inputText={inputText} report={generatedReport} />
       )}
     </div>
+    </ProtectedRoute>
   );
 }

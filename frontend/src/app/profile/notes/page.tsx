@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { getNotes, deleteNote, uploadNoteText } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Note } from '@/lib/types';
 import FileUploader from '@/components/FileUploader';
 import NotesList from '@/components/NotesList';
@@ -64,6 +65,7 @@ export default function NotesPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <ProtectedRoute>
     <div className="max-w-4xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <FileText size={24} className="text-primary-500" />
@@ -132,5 +134,6 @@ export default function NotesPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import {
   getDoctor,
   updateDoctor,
@@ -83,17 +84,24 @@ export default function DoctorDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={32} className="animate-spin text-primary-500" />
-      </div>
+      <ProtectedRoute requiredRole="Admin">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-primary-500" />
+        </div>
+      </ProtectedRoute>
     );
   }
 
   if (!doctor) {
-    return <div className="text-center py-20 text-slate-500">Doctor not found.</div>;
+    return (
+      <ProtectedRoute requiredRole="Admin">
+        <div className="text-center py-20 text-slate-500">Doctor not found.</div>
+      </ProtectedRoute>
+    );
   }
 
   return (
+    <ProtectedRoute requiredRole="Admin">
     <div className="max-w-5xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <User size={24} className="text-primary-500" />
@@ -171,5 +179,6 @@ export default function DoctorDetailPage() {
         <NotesList doctorId={doctorId} notes={notes} onDelete={handleDeleteNote} />
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

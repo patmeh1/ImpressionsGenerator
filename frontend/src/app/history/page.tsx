@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { getReports } from '@/lib/api';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import type { Report } from '@/lib/types';
 import {
   Search,
@@ -49,6 +50,7 @@ export default function HistoryPage() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
+    <ProtectedRoute>
     <div className="max-w-6xl mx-auto space-y-6">
       <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
         <HistoryIcon size={24} className="text-primary-500" />
@@ -201,5 +203,6 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+    </ProtectedRoute>
   );
 }
