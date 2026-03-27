@@ -4,9 +4,11 @@ import re
 
 import pytest
 
+from app.services.grounding import validate_grounding, GroundingResult
+
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (for local extraction checks)
 # ---------------------------------------------------------------------------
 MEASUREMENT_PATTERN = re.compile(
     r"\d+\.?\d*\s*(?:cm|mm|mL|cc|%|mg|g|kg|lb|in|ft)"
@@ -32,21 +34,6 @@ def extract_percentages(text: str) -> list[str]:
     return PERCENTAGE_PATTERN.findall(text)
 
 
-def validate_grounding(input_text: str, output_text: str) -> dict:
-    """Check that every measurement in the output exists in the input."""
-    input_measurements = set(extract_measurements(input_text))
-    output_measurements = set(extract_measurements(output_text))
-    hallucinated = output_measurements - input_measurements
-    missing = input_measurements - output_measurements
-    return {
-        "input_measurements": input_measurements,
-        "output_measurements": output_measurements,
-        "hallucinated": hallucinated,
-        "missing": missing,
-        "grounded": len(hallucinated) == 0,
-    }
-
-
 # ---------------------------------------------------------------------------
 # T03 – numbers preserved in output
 # ---------------------------------------------------------------------------
@@ -61,7 +48,7 @@ def test_numbers_preserved_in_output():
         "The liver measures 14.5 cm in craniocaudal dimension."
     )
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"], f"Hallucinated measurements: {result['hallucinated']}"
+    assert result.is_grounded, f"Hallucinated values: {result.hallucinated_values}"
     assert "3.2 cm" in output_text
     assert "14.5 cm" in output_text
 
@@ -74,8 +61,8 @@ def test_no_hallucinated_measurements():
     input_text = "The liver appears normal. No focal lesion identified."
     output_text = "The liver is unremarkable. No focal lesion is seen."
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"], f"Hallucinated measurements found: {result['hallucinated']}"
-    assert len(result["output_measurements"]) == 0
+    assert result.is_grounded, f"Hallucinated values found: {result.hallucinated_values}"
+    assert len(result.output_values.get("measurements", [])) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -123,9 +110,9 @@ def test_multiple_measurements_all_preserved():
         "Gallbladder wall thickness is 3 mm."
     )
     result = validate_grounding(input_text, output_text)
-    assert result["grounded"]
-    assert len(result["missing"]) == 0, (
-        f"Missing measurements: {result['missing']}"
+    assert result.is_grounded
+    assert len(result.missing_from_output) == 0, (
+        f"Missing measurements: {result.missing_from_output}"
     )
 
 
@@ -137,8 +124,45 @@ def test_grounding_flag_when_value_missing():
     input_text = "Mass measures 3.2 cm. Liver is 15.0 cm."
     output_text = "A mass is present. The liver measures 15.0 cm."
     result = validate_grounding(input_text, output_text)
-    # 3.2 cm is missing from output – should NOT be grounded
-    assert not result["grounded"] or "3.2 cm" in result["missing"], (
+    missing_strs = " ".join(result.missing_from_output)
+    assert "3.2" in missing_strs, (
         "Grounding should flag that 3.2 cm is missing from output"
     )
-    assert "3.2 cm" in result["missing"]
+
+
+# ---------------------------------------------------------------------------
+# to_dict() returns acceptance-criteria fields
+# ---------------------------------------------------------------------------
+def test_grounding_result_dict_has_required_fields():
+    """to_dict() must include is_valid, preserved_values, missing_values, suspicious_values."""
+    input_text = "Liver 14.5 cm. Mass 3.2 cm."
+    output_text = "Liver 14.5 cm. Mass 3.2 cm."
+    result = validate_grounding(input_text, output_text)
+    d = result.to_dict()
+    assert "is_valid" in d
+    assert "preserved_values" in d
+    assert "missing_values" in d
+    assert "suspicious_values" in d
+    assert d["is_valid"] is True
+    assert len(d["suspicious_values"]) == 0
+
+
+def test_grounding_preserved_values_populated():
+    """preserved_values should contain values found in both input and output."""
+    input_text = "Mass 3.2 cm. Liver 14.5 cm."
+    output_text = "Mass 3.2 cm. Liver 14.5 cm."
+    result = validate_grounding(input_text, output_text)
+    d = result.to_dict()
+    preserved_str = " ".join(d["preserved_values"])
+    assert "3.2" in preserved_str
+    assert "14.5" in preserved_str
+
+
+def test_grounding_suspicious_values_on_hallucination():
+    """suspicious_values should contain values in output not in input."""
+    input_text = "The liver appears normal."
+    output_text = "The liver measures 16.0 cm and appears normal."
+    result = validate_grounding(input_text, output_text)
+    d = result.to_dict()
+    assert d["is_valid"] is False
+    assert len(d["suspicious_values"]) > 0
