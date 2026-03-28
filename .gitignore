@@ -29,6 +29,7 @@ yarn-error.log*
 # Azure
 .azure/
 local.settings.json
+infrastructure/**/*.json
 
 # IDE
 .vscode/

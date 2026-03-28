@@ -1,6 +1,6 @@
 // ============================================================================
 // Container Apps Module — Environment + FastAPI backend container
-// System-assigned managed identity for Key Vault / Cosmos / Storage access
+// User-assigned managed identity for Key Vault / Cosmos / Storage access
 // ============================================================================
 
 @description('Azure region for all resources')
@@ -15,6 +15,12 @@ param projectName string
 
 @description('Container image to deploy')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+
+@description('User-assigned managed identity resource ID')
+param managedIdentityId string
+
+@description('User-assigned managed identity client ID')
+param managedIdentityClientId string
 
 @description('Cosmos DB endpoint')
 param cosmosEndpoint string
@@ -43,6 +49,9 @@ param appInsightsConnectionString string
 @description('Log Analytics workspace resource ID')
 param logAnalyticsWorkspaceId string
 
+@description('Key Vault URI for secret references')
+param keyVaultUri string
+
 var isProduction = environmentName == 'prod'
 var minReplicas = isProduction ? 1 : 0
 var maxReplicas = isProduction ? 10 : 3
@@ -68,7 +77,10 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${projectName}-api-${environmentName}'
   location: location
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${managedIdentityId}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnv.id
@@ -136,6 +148,14 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               name: 'ENVIRONMENT'
               value: environmentName
             }
+            {
+              name: 'KEY_VAULT_URI'
+              value: keyVaultUri
+            }
+            {
+              name: 'AZURE_CLIENT_ID'
+              value: managedIdentityClientId
+            }
           ]
         }
       ]
@@ -159,4 +179,3 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 // --- Outputs ---
 output containerAppUrl string = 'https://${containerApp.properties.configuration.ingress.fqdn}'
-output containerAppPrincipalId string = containerApp.identity.principalId
